@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>海湾精酿吧</title>
+  <title>啤酒小程序</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -127,8 +127,24 @@
     .success-icon { font-size: 60px; margin-bottom: 12px; }
     .success-title { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
     .success-sub { color: #888; font-size: 14px; margin-bottom: 6px; }
-    .success-amount { color: #f5a01e; font-size: 28px; font-weight: 800; margin-bottom: 20px; }
+    .success-amount { color: #f5a01e; font-size: 28px; font-weight: 800; margin-bottom: 14px; }
+    .order-track { background: #f8f8fc; border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 13px; }
+    .order-track-label { color: #888; margin-bottom: 6px; }
+    .order-track-status { font-weight: 700; color: #1a1a2e; font-size: 15px; }
     .success-close { width: 100%; padding: 13px; background: #f5a01e; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+    /* ── Table Modal ── */
+    .table-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 500; display: none; align-items: center; justify-content: center; }
+    .table-modal-overlay.show { display: flex; }
+    .table-modal { background: #fff; border-radius: 18px; width: 280px; max-width: 88vw; padding: 28px 24px; text-align: center; }
+    .table-modal h3 { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
+    .table-modal p { color: #888; font-size: 13px; margin-bottom: 18px; }
+    .table-modal input { width: 100%; padding: 12px; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 18px; text-align: center; font-weight: 700; outline: none; }
+    .table-modal input:focus { border-color: #f5a01e; }
+    .table-modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+    .table-modal-btns button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .btn-confirm-table { background: #f5a01e; color: #fff; }
+    .btn-cancel-table { background: #f0f0f5; color: #666; }
 
     /* ── Toast ── */
     .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); background: rgba(0,0,0,0.75); color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.2s; pointer-events: none; }
@@ -143,21 +159,21 @@
 <div class="header">
   <div class="header-top">
     <div class="header-left">
-      <div class="shop-name">海湾精酿吧</div>
+      <div class="shop-name" id="shopName">加载中…</div>
       <div class="shop-meta">
         <span class="loc-icon">📍</span>
         <span class="status-dot"></span>
         <span class="status-text">营业中</span>
         <span class="status-text">•</span>
-        <span class="change-link">更换</span>
+        <span class="change-link" onclick="showTableModal()">更换桌号</span>
       </div>
     </div>
     <div class="header-right">
       <div class="table-badge">
         <div class="table-label">桌号</div>
-        <div class="table-num" id="tableNo">1</div>
+        <div class="table-num" id="tableNo">-</div>
       </div>
-      <button class="settings-btn">⚙️</button>
+      <button class="settings-btn" onclick="showTableModal()">⚙️</button>
     </div>
   </div>
   <div class="categories" id="categories">
@@ -204,18 +220,15 @@
 <div class="pay-overlay" id="payOverlay">
   <div class="pay-modal">
     <div class="pay-header">
-      <div class="pay-shop">海湾精酿吧</div>
+      <div class="pay-shop" id="payShop">—</div>
       <div class="pay-amount" id="payAmount">¥0</div>
       <div class="pay-amount-label">需支付金额</div>
       <div class="pay-order-info" id="payOrderInfo"></div>
     </div>
     <div class="pay-body">
-      <!-- Polling indicator -->
       <div class="pay-status-bar" id="payStatusBar">
         <span class="spin">⟳</span> 等待支付中，请完成扫码…
       </div>
-
-      <!-- Method Tabs -->
       <div class="pay-method-tabs">
         <div class="pay-tab active" id="tab-wechat" onclick="switchPayMethod('wechat')">
           <span class="pay-tab-icon">💚</span>
@@ -226,8 +239,6 @@
           <span class="pay-tab-name">支付宝</span>
         </div>
       </div>
-
-      <!-- QR Code -->
       <div class="qr-section">
         <div class="qr-box">
           <div id="qrcode"></div>
@@ -235,10 +246,7 @@
         <div class="qr-hint" id="qrHint">请使用微信扫一扫完成支付</div>
         <div class="qr-timer" id="qrTimer">二维码有效期 15:00</div>
       </div>
-
       <div class="pay-divider"><span>演示模式</span></div>
-
-      <!-- Mock Pay Button -->
       <button class="mock-pay-btn" id="mockPayBtn" onclick="mockPay()">
         <span id="mockPayIcon">💚</span> 模拟微信支付成功
       </button>
@@ -254,7 +262,24 @@
     <div class="success-title">支付成功！</div>
     <div class="success-sub" id="successSub">订单已提交</div>
     <div class="success-amount" id="successAmount"></div>
+    <div class="order-track" id="orderTrack">
+      <div class="order-track-label">订单状态</div>
+      <div class="order-track-status" id="orderTrackStatus">备餐中 🍺</div>
+    </div>
     <button class="success-close" onclick="closeSuccess()">好的，继续点单</button>
+  </div>
+</div>
+
+<!-- Table Number Modal -->
+<div class="table-modal-overlay" id="tableModalOverlay">
+  <div class="table-modal">
+    <h3>请输入桌号</h3>
+    <p>请确认您的桌号，方便店员送餐</p>
+    <input type="text" id="tableInput" placeholder="例如：5" maxlength="10" inputmode="numeric">
+    <div class="table-modal-btns">
+      <button class="btn-cancel-table" id="tableCancelBtn" onclick="cancelTableModal()">取消</button>
+      <button class="btn-confirm-table" onclick="confirmTableNo()">确认</button>
+    </div>
   </div>
 </div>
 
@@ -266,10 +291,13 @@
   let allProducts = [];
   let cart = {};
   let currentPayment = null;
+  let currentOrderId = null;
   let pollTimer = null;
   let countdownTimer = null;
+  let orderTrackTimer = null;
   let payMethod = 'wechat';
   let qrInstance = null;
+  let merchantName = '啤酒小程序';
 
   function escapeHtml(str) {
     return String(str)
@@ -280,7 +308,54 @@
       .replace(/'/g, '&#39;');
   }
 
-  // ── Category filter ──────────────────────────────────
+  // ── Merchant info ─────────────────────────────────────────
+  async function loadMerchantInfo() {
+    try {
+      const res = await fetch(`/api/merchants/${MERCHANT_ID}`);
+      if (!res.ok) return;
+      const m = await res.json();
+      merchantName = m.name;
+      document.getElementById('shopName').textContent = merchantName;
+      document.getElementById('payShop').textContent = merchantName;
+      document.title = merchantName;
+    } catch (_) {}
+  }
+
+  // ── Table number ──────────────────────────────────────────
+  function initTableNo() {
+    const saved = localStorage.getItem('tableNo_' + MERCHANT_ID);
+    if (saved) {
+      document.getElementById('tableNo').textContent = saved;
+    } else {
+      showTableModal(true);
+    }
+  }
+
+  function showTableModal(required = false) {
+    const saved = localStorage.getItem('tableNo_' + MERCHANT_ID) || '';
+    document.getElementById('tableInput').value = saved;
+    document.getElementById('tableCancelBtn').style.display = required ? 'none' : '';
+    document.getElementById('tableModalOverlay').classList.add('show');
+    setTimeout(() => document.getElementById('tableInput').focus(), 100);
+  }
+
+  function cancelTableModal() {
+    document.getElementById('tableModalOverlay').classList.remove('show');
+  }
+
+  function confirmTableNo() {
+    const val = document.getElementById('tableInput').value.trim();
+    if (!val) { showToast('请输入桌号'); return; }
+    localStorage.setItem('tableNo_' + MERCHANT_ID, val);
+    document.getElementById('tableNo').textContent = val;
+    document.getElementById('tableModalOverlay').classList.remove('show');
+  }
+
+  document.getElementById('tableInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmTableNo();
+  });
+
+  // ── Category filter ──────────────────────────────────────
   document.getElementById('categories').addEventListener('click', e => {
     const btn = e.target.closest('.cat-btn');
     if (!btn) return;
@@ -289,7 +364,7 @@
     renderProducts(btn.dataset.cat);
   });
 
-  // ── Products ─────────────────────────────────────────
+  // ── Products ─────────────────────────────────────────────
   async function loadProducts() {
     try {
       const res = await fetch('/api/products');
@@ -328,7 +403,7 @@
     `).join('');
   }
 
-  // ── Cart ─────────────────────────────────────────────
+  // ── Cart ─────────────────────────────────────────────────
   function addToCart(id) {
     const p = allProducts.find(p => p.id === id);
     if (!p) return;
@@ -390,16 +465,16 @@
     `).join('');
   }
 
-  // ── Checkout & Payment ───────────────────────────────
+  // ── Checkout & Payment ───────────────────────────────────
   async function goCheckout() {
     const items = Object.values(cart);
     if (!items.length) { showToast('请先选择商品'); return; }
+    const tableNo = localStorage.getItem('tableNo_' + MERCHANT_ID);
+    if (!tableNo) { showTableModal(true); return; }
     closeCart();
 
     try {
-      // 1. Create order
       const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-      const tableNo = document.getElementById('tableNo').textContent;
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -412,8 +487,8 @@
       });
       if (!orderRes.ok) throw new Error(`下单失败 HTTP ${orderRes.status}`);
       const order = await orderRes.json();
+      currentOrderId = order.id;
 
-      // 2. Create payment
       const payRes = await fetch('/api/payments/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,7 +497,6 @@
       if (!payRes.ok) throw new Error(`创建支付失败 HTTP ${payRes.status}`);
       currentPayment = await payRes.json();
 
-      // 3. Show payment modal
       showPayModal(order, currentPayment);
     } catch (e) {
       showToast('下单失败，请重试');
@@ -432,16 +506,11 @@
   function showPayModal(order, payment) {
     const totalCount = order.items.reduce((s, i) => s + i.quantity, 0);
     document.getElementById('payAmount').textContent = `¥${payment.amount}`;
+    document.getElementById('payShop').textContent = merchantName;
     document.getElementById('payOrderInfo').textContent = `桌号 ${order.table_no} · ${totalCount} 件商品`;
     document.getElementById('payOverlay').classList.add('show');
-
-    // Build QR code (encode the payment ID so gateway can identify it)
     buildQR(payment.id);
-
-    // Start countdown
     startCountdown(payment.expired_at);
-
-    // Start polling
     startPolling(payment.id);
   }
 
@@ -465,7 +534,9 @@
     document.getElementById('qrHint').textContent = isAlipay ? '请使用支付宝扫一扫完成支付' : '请使用微信扫一扫完成支付';
     document.getElementById('mockPayBtn').textContent = isAlipay ? '🔵 模拟支付宝支付成功' : '💚 模拟微信支付成功';
     document.getElementById('mockPayBtn').className = `mock-pay-btn${isAlipay ? ' alipay' : ''}`;
-    // Update payment method on server
+    // Rebuild QR for new method
+    if (currentPayment) buildQR(currentPayment.id);
+    // Update method on server
     if (currentPayment) {
       fetch('/api/payments/create', {
         method: 'POST',
@@ -489,7 +560,6 @@
   function startPolling(paymentId) {
     clearInterval(pollTimer);
     let failures = 0;
-    const MAX_FAILURES = 20;
     pollTimer = setInterval(async () => {
       try {
         const res = await fetch(`/api/payments/${paymentId}`);
@@ -500,6 +570,8 @@
           clearInterval(pollTimer);
           clearInterval(countdownTimer);
           closePayModal();
+          cart = {};
+          updateCartUI();
           showSuccess(p.amount);
         } else if (p.status === 'expired') {
           clearInterval(pollTimer);
@@ -508,8 +580,7 @@
           showToast('⚠️ 支付已超时，请重新下单');
         }
       } catch (_) {
-        failures++;
-        if (failures >= MAX_FAILURES) {
+        if (++failures >= 20) {
           clearInterval(pollTimer);
           showToast('网络异常，请联系客服或刷新重试');
         }
@@ -529,7 +600,6 @@
         clearInterval(pollTimer);
         clearInterval(countdownTimer);
         closePayModal();
-        // Clear cart after successful payment
         cart = {};
         updateCartUI();
         showSuccess(currentPayment.amount);
@@ -557,18 +627,51 @@
     btn.innerHTML = '<span id="mockPayIcon">💚</span> 模拟微信支付成功';
   }
 
+  // ── Order tracking after payment ─────────────────────────
+  const ORDER_STATUS_LABELS = {
+    paid: '已支付，等待备餐 ⏳',
+    preparing: '备餐中 🍺',
+    completed: '已完成，请取餐 ✅',
+    refunded: '已退款',
+    cancelled: '已取消',
+  };
+
   function showSuccess(amount) {
     document.getElementById('successAmount').textContent = `¥${amount}`;
     document.getElementById('successSub').textContent = `支付方式：${payMethod === 'wechat' ? '微信支付' : '支付宝'}`;
     document.getElementById('successOverlay').classList.add('show');
+    if (currentOrderId) startOrderTracking(currentOrderId);
+  }
+
+  function startOrderTracking(orderId) {
+    clearInterval(orderTrackTimer);
+    const el = document.getElementById('orderTrackStatus');
+    el.textContent = '查询中…';
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(`/api/orders/${orderId}/status`);
+        if (!res.ok) return;
+        const o = await res.json();
+        el.textContent = ORDER_STATUS_LABELS[o.status] || o.status;
+        if (o.status === 'completed' || o.status === 'refunded' || o.status === 'cancelled') {
+          clearInterval(orderTrackTimer);
+        }
+      } catch (_) {}
+    }
+
+    fetchStatus();
+    orderTrackTimer = setInterval(fetchStatus, 10000);
   }
 
   function closeSuccess() {
+    clearInterval(orderTrackTimer);
     document.getElementById('successOverlay').classList.remove('show');
     currentPayment = null;
+    currentOrderId = null;
   }
 
-  // ── Toast ─────────────────────────────────────────────
+  // ── Toast ─────────────────────────────────────────────────
   function showToast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -576,6 +679,9 @@
     setTimeout(() => el.classList.remove('show'), 1800);
   }
 
+  // ── Init ──────────────────────────────────────────────────
+  loadMerchantInfo();
+  initTableNo();
   loadProducts();
 </script>
 </body>

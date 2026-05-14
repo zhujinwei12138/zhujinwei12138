@@ -121,8 +121,7 @@ def _verify_gateway_signature(gateway: str, body_bytes: bytes, signature: str | 
     """
     secret = os.getenv("PAYMENT_WEBHOOK_SECRET")
     if not secret:
-        logger.warning("PAYMENT_WEBHOOK_SECRET not set; skipping signature verification for %s", gateway)
-        return True
+        raise HTTPException(500, "Server misconfigured: PAYMENT_WEBHOOK_SECRET not set")
     if not signature:
         return False
     expected = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()

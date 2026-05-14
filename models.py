@@ -69,7 +69,9 @@ class Payment(Base):
     order_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
     )
-    merchant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.id", ondelete="RESTRICT"), nullable=False
+    )
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     method: Mapped[str] = mapped_column(String(20), default="wechat")
     status: Mapped[str] = mapped_column(String(20), default="pending")

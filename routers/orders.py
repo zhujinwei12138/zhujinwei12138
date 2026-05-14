@@ -22,6 +22,15 @@ async def list_orders(skip: int = 0, limit: int = 200, db: AsyncSession = Depend
     return result.scalars().all()
 
 
+@router.get("/{order_id}/status")
+async def get_order_status(order_id: int, db: AsyncSession = Depends(get_db)):
+    """Public — customer order status tracking."""
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    return {"id": order.id, "status": order.status}
+
+
 @router.get("/{order_id}", response_model=OrderOut, dependencies=[Depends(verify_admin)])
 async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
     order = await db.get(Order, order_id)

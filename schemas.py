@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Any, Optional
-from pydantic import BaseModel, ConfigDict
+from typing import Any, Literal, Optional
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Product ────────────────────────────────────────────────
@@ -19,11 +19,11 @@ class ProductOut(BaseModel):
 
 # ── Merchant ───────────────────────────────────────────────
 class MerchantIn(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     phone: Optional[str] = None
     address: Optional[str] = None
-    table_count: int = 10
-    status: str = "active"
+    table_count: int = Field(10, ge=1, le=500)
+    status: Literal["active", "inactive"] = "active"
 
 
 class MerchantOut(BaseModel):
@@ -41,20 +41,20 @@ class MerchantOut(BaseModel):
 class OrderItem(BaseModel):
     id: int
     name: str
-    price: float
-    quantity: int
+    price: float = Field(..., gt=0)
+    quantity: int = Field(..., ge=1)
 
 
 # ── Order ──────────────────────────────────────────────────
 class OrderIn(BaseModel):
-    merchant_id: int
-    table_no: str
-    items: list[OrderItem]
-    total: float
+    merchant_id: int = Field(..., gt=0)
+    table_no: str = Field(..., min_length=1, max_length=20)
+    items: list[OrderItem] = Field(..., min_length=1)
+    total: float = Field(..., gt=0)
 
 
 class OrderStatusIn(BaseModel):
-    status: str  # preparing | completed | cancelled
+    status: Literal["preparing", "completed", "cancelled"]
 
 
 class OrderOut(BaseModel):
@@ -75,12 +75,12 @@ class OrderOut(BaseModel):
 
 # ── Payment ────────────────────────────────────────────────
 class PaymentCreateIn(BaseModel):
-    order_id: int
-    method: str = "wechat"
+    order_id: int = Field(..., gt=0)
+    method: Literal["wechat", "alipay"] = "wechat"
 
 
 class RefundIn(BaseModel):
-    reason: str = "管理员操作退款"
+    reason: str = Field("管理员操作退款", min_length=1, max_length=200)
 
 
 class PaymentOut(BaseModel):

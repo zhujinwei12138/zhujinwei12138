@@ -10,6 +10,15 @@ from schemas import MerchantIn, MerchantOut
 router = APIRouter(prefix="/api/merchants", tags=["merchants"])
 
 
+@router.get("/{merchant_id}", response_model=MerchantOut)
+async def get_merchant_public(merchant_id: int, db: AsyncSession = Depends(get_db)):
+    """Public endpoint — returns merchant info without auth (needed by customer page)."""
+    merchant = await db.get(Merchant, merchant_id)
+    if not merchant:
+        raise HTTPException(404, "Merchant not found")
+    return merchant
+
+
 @router.get("", response_model=list[MerchantOut], dependencies=[Depends(verify_admin)])
 async def list_merchants(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Merchant).order_by(Merchant.created_at).offset(skip).limit(limit))

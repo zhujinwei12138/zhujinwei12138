@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>啤酒小程序 · 管理后台</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif; background: #f0f2f8; display: flex; min-height: 100vh; color: #333; }
@@ -43,7 +44,7 @@
 
     /* ── Cards ── */
     .card { background: #fff; border-radius: 14px; padding: 22px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
     .card-title { font-size: 15px; font-weight: 600; color: #1a1a2e; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
@@ -76,6 +77,8 @@
     .btn-sm { padding: 5px 12px; font-size: 12px; }
     .btn-success { background: #e8f5e9; color: #2e7d32; }
     .btn-success:hover { background: #c8e6c9; }
+    .btn-qr { background: #f3e5f5; color: #6a1b9a; }
+    .btn-qr:hover { background: #e1bee7; }
 
     /* ── Rank bar ── */
     .rank-bar { display: flex; align-items: center; gap: 10px; }
@@ -99,10 +102,21 @@
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     .btn-cancel { background: #f0f0f5; color: #666; }
 
+    /* ── QR Modal ── */
+    .qr-modal { background: #fff; border-radius: 16px; padding: 28px 24px; width: 280px; max-width: 90vw; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .qr-modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #1a1a2e; }
+    .qr-modal p { font-size: 12px; color: #999; margin-bottom: 16px; }
+    #merchantQrcode { display: inline-block; }
+    .qr-modal-link { display: block; font-size: 11px; color: #888; word-break: break-all; margin: 12px 0 16px; }
+    .qr-copy-btn { background: #f5a01e; color: #fff; border: none; border-radius: 8px; padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+    /* ── Filter bar ── */
+    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .filter-bar select { padding: 7px 12px; border: 1.5px solid #e8e8ee; border-radius: 8px; font-size: 13px; outline: none; background: #fafafa; cursor: pointer; }
+    .filter-bar select:focus { border-color: #f5a01e; }
+
     .order-items-cell { font-size: 12px; color: #888; max-width: 180px; }
     .empty { text-align: center; padding: 40px; color: #bbb; font-size: 14px; }
-
-    /* ── Payment method icon ── */
     .pay-method { display: flex; align-items: center; gap: 6px; font-size: 13px; }
     .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -181,7 +195,7 @@
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <span class="topbar-title" id="topbarTitle">数据概览</span>
     <div class="topbar-right">
-      <span class="topbar-badge">🍺 海湾精酿吧系统</span>
+      <span class="topbar-badge">🍺 啤酒小程序系统</span>
       <a href="/customer/" target="_blank" style="color:#f5a01e;font-size:13px;text-decoration:none">→ 顾客端</a>
     </div>
   </div>
@@ -241,7 +255,22 @@
     <!-- ── Orders ── -->
     <div class="section" id="sec-orders">
       <div class="card">
-        <div class="card-header"><span class="card-title">订单列表</span><button class="btn btn-primary btn-sm" onclick="loadOrders()">🔄 刷新</button></div>
+        <div class="card-header">
+          <span class="card-title">订单列表</span>
+          <div class="filter-bar">
+            <select id="orderStatusFilter" onchange="renderOrders()">
+              <option value="">全部状态</option>
+              <option value="pending_payment">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="preparing">备餐中</option>
+              <option value="completed">已完成</option>
+              <option value="refunded">已退款</option>
+              <option value="cancelled">已取消</option>
+            </select>
+            <select id="orderMerchantFilter" onchange="renderOrders()"><option value="">全部商家</option></select>
+            <button class="btn btn-primary btn-sm" onclick="loadOrders()">🔄 刷新</button>
+          </div>
+        </div>
         <table>
           <thead><tr><th>订单号</th><th>商家</th><th>桌号</th><th>商品</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
           <tbody id="ordersTable"></tbody>
@@ -257,7 +286,20 @@
         <div class="stat-card"><div class="stat-icon" style="background:#fce4ec">↩️</div><div class="stat-info"><p>退款笔数</p><h3 id="p-refunds">-</h3></div></div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title">支付记录</span><button class="btn btn-primary btn-sm" onclick="loadPayments()">🔄 刷新</button></div>
+        <div class="card-header">
+          <span class="card-title">支付记录</span>
+          <div class="filter-bar">
+            <select id="payStatusFilter" onchange="renderPayments()">
+              <option value="">全部状态</option>
+              <option value="pending">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="expired">已过期</option>
+              <option value="refunded">已退款</option>
+            </select>
+            <select id="payMerchantFilter" onchange="renderPayments()"><option value="">全部商家</option></select>
+            <button class="btn btn-primary btn-sm" onclick="loadPayments()">🔄 刷新</button>
+          </div>
+        </div>
         <table>
           <thead><tr><th>支付单号</th><th>商家</th><th>金额</th><th>方式</th><th>状态</th><th>交易号</th><th>时间</th><th>操作</th></tr></thead>
           <tbody id="paymentsTable"></tbody>
@@ -303,11 +345,29 @@
   </div>
 </div>
 
+<!-- Merchant QR Modal -->
+<div class="modal-overlay" id="qrModal">
+  <div class="qr-modal">
+    <h3 id="qrModalTitle">顾客点单二维码</h3>
+    <p>顾客扫码后可直接进入点单页面</p>
+    <div id="merchantQrcode"></div>
+    <a class="qr-modal-link" id="qrModalLink" href="#" target="_blank"></a>
+    <button class="qr-copy-btn" onclick="copyQrLink()">复制链接</button>
+    <div style="margin-top:12px">
+      <button class="btn btn-cancel" onclick="closeQrModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let merchantsCache = [];
+  let allOrders = [];
+  let allPayments = [];
+  let mMapCache = {};
   let charts = {};
+  let autoRefreshTimer = null;
 
-  // ── Mobile sidebar ────────────────────────────────────
+  // ── Mobile sidebar ────────────────────────────────────────
   function toggleSidebar() {
     document.querySelector('.sidebar').classList.toggle('open');
     document.getElementById('sidebarOverlay').classList.toggle('show');
@@ -317,7 +377,7 @@
     document.getElementById('sidebarOverlay').classList.remove('show');
   }
 
-  // ── Auth (JWT) ───────────────────────────────────────
+  // ── Auth (JWT) ────────────────────────────────────────────
   function getToken() { return localStorage.getItem('adminToken'); }
 
   function checkAuth() {
@@ -355,6 +415,7 @@
 
   function doLogout() {
     localStorage.removeItem('adminToken');
+    clearAutoRefresh();
     document.getElementById('loginOverlay').style.display = 'flex';
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPw').value = '';
@@ -364,7 +425,7 @@
     if (e.key === 'Enter') doLogin();
   });
 
-  // ── Helpers ──────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────
   function showError(msg) {
     const el = document.getElementById('errorToast');
     el.textContent = msg;
@@ -385,27 +446,35 @@
     return res.json();
   }
 
-  // ── Navigation ──────────────────────────────────────
-  const sectionLoaders = {
-    dashboard: loadDashboard,
-    stats: loadStats,
-    merchants: loadMerchants,
-    orders: loadOrders,
-    payments: loadPayments
-  };
+  // ── Auto-refresh ──────────────────────────────────────────
+  function clearAutoRefresh() {
+    if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+  }
+
+  function startAutoRefresh(loaderFn) {
+    clearAutoRefresh();
+    autoRefreshTimer = setInterval(loaderFn, 30000);
+  }
+
+  // ── Navigation ────────────────────────────────────────────
   const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', orders: '订单管理', payments: '支付管理' };
 
   function switchSection(id, el) {
+    clearAutoRefresh();
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('sec-' + id).classList.add('active');
     el.classList.add('active');
     document.getElementById('topbarTitle').textContent = sectionTitles[id];
-    sectionLoaders[id]?.();
+    if (id === 'dashboard') loadDashboard();
+    else if (id === 'stats') loadStats();
+    else if (id === 'merchants') loadMerchants();
+    else if (id === 'orders') { loadOrders(); startAutoRefresh(loadOrders); }
+    else if (id === 'payments') { loadPayments(); startAutoRefresh(loadPayments); }
     closeSidebar();
   }
 
-  // ── Dashboard ────────────────────────────────────────
+  // ── Dashboard ─────────────────────────────────────────────
   async function loadDashboard() {
     try {
       const [summary, stats] = await Promise.all([
@@ -455,7 +524,7 @@
     });
   }
 
-  // ── Stats ────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────
   async function loadStats() {
     try {
       const stats = await safeFetch('/api/stats');
@@ -485,7 +554,7 @@
     }
   }
 
-  // ── Merchants ────────────────────────────────────────
+  // ── Merchants ─────────────────────────────────────────────
   async function loadMerchants() {
     try {
       merchantsCache = await safeFetch('/api/merchants');
@@ -499,6 +568,7 @@
           <td><span class="tag ${m.status === 'active' ? 'tag-green' : 'tag-red'}">${m.status === 'active' ? '营业中' : '已关闭'}</span></td>
           <td style="color:#999;font-size:12px">${new Date(m.created_at).toLocaleDateString('zh-CN')}</td>
           <td class="action-btns">
+            <button class="btn btn-qr btn-sm" onclick="showMerchantQR(${m.id},'${m.name.replace(/'/g,"\\'")}')">二维码</button>
             <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})">编辑</button>
             <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">删除</button>
           </td>
@@ -507,6 +577,27 @@
     } catch (e) {
       showError('加载商家列表失败');
     }
+  }
+
+  // ── Merchant QR code ──────────────────────────────────────
+  let qrCodeInstance = null;
+
+  function showMerchantQR(id, name) {
+    const url = `${location.origin}/customer/?mid=${id}`;
+    document.getElementById('qrModalTitle').textContent = `${name} · 顾客点单二维码`;
+    document.getElementById('qrModalLink').textContent = url;
+    document.getElementById('qrModalLink').href = url;
+    const el = document.getElementById('merchantQrcode');
+    el.innerHTML = '';
+    qrCodeInstance = new QRCode(el, { text: url, width: 180, height: 180, colorDark: '#1e1e40', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+    document.getElementById('qrModal').classList.add('show');
+  }
+
+  function closeQrModal() { document.getElementById('qrModal').classList.remove('show'); }
+
+  function copyQrLink() {
+    const url = document.getElementById('qrModalLink').textContent;
+    navigator.clipboard.writeText(url).then(() => alert('链接已复制到剪贴板')).catch(() => alert(url));
   }
 
   function openMerchantModal() {
@@ -549,14 +640,14 @@
     const m = merchantsCache.find(m => m.id === id);
     if (!confirm(`确定删除商家「${m?.name}」？`)) return;
     try {
-      await fetch(`/api/merchants/${id}`, { method: 'DELETE' });
+      await safeFetch(`/api/merchants/${id}`, { method: 'DELETE' });
       loadMerchants();
     } catch (e) {
       showError('删除失败，请重试');
     }
   }
 
-  // ── Orders ───────────────────────────────────────────
+  // ── Orders ────────────────────────────────────────────────
   const ORDER_STATUS_MAP = {
     pending_payment: { label: '待支付', cls: 'tag-orange' },
     paid:            { label: '已支付', cls: 'tag-blue' },
@@ -572,30 +663,44 @@
         safeFetch('/api/orders'),
         safeFetch('/api/merchants')
       ]);
-      const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
-      const sorted = [...orders].sort((a, b) => b.id - a.id);
-      const tbody = document.getElementById('ordersTable');
-      if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
-      tbody.innerHTML = sorted.map(o => {
-        const st = ORDER_STATUS_MAP[o.status] || { label: o.status, cls: 'tag-gray' };
-        let actionBtns = '';
-        if (o.status === 'paid') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'preparing')">开始备餐</button>`;
-        if (o.status === 'preparing') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'completed')">标记完成</button>`;
-        return `
-          <tr>
-            <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
-            <td>${mMap[o.merchant_id] || '未知'}</td>
-            <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
-            <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
-            <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
-            <td><span class="tag ${st.cls}">${st.label}</span></td>
-            <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-            <td class="action-btns">${actionBtns}</td>
-          </tr>`;
-      }).join('');
+      allOrders = orders;
+      mMapCache = Object.fromEntries(merchants.map(m => [m.id, m.name]));
+      // Populate merchant filter
+      const sel = document.getElementById('orderMerchantFilter');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">全部商家</option>' + merchants.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      sel.value = cur;
+      renderOrders();
     } catch (e) {
       showError('加载订单失败');
     }
+  }
+
+  function renderOrders() {
+    const statusFilter = document.getElementById('orderStatusFilter').value;
+    const merchantFilter = document.getElementById('orderMerchantFilter').value;
+    let list = [...allOrders].sort((a, b) => b.id - a.id);
+    if (statusFilter) list = list.filter(o => o.status === statusFilter);
+    if (merchantFilter) list = list.filter(o => String(o.merchant_id) === merchantFilter);
+    const tbody = document.getElementById('ordersTable');
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
+    tbody.innerHTML = list.map(o => {
+      const st = ORDER_STATUS_MAP[o.status] || { label: o.status, cls: 'tag-gray' };
+      let actionBtns = '';
+      if (o.status === 'paid') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'preparing')">开始备餐</button>`;
+      if (o.status === 'preparing') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'completed')">标记完成</button>`;
+      return `
+        <tr>
+          <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
+          <td>${mMapCache[o.merchant_id] || '未知'}</td>
+          <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
+          <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
+          <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
+          <td><span class="tag ${st.cls}">${st.label}</span></td>
+          <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="action-btns">${actionBtns}</td>
+        </tr>`;
+    }).join('');
   }
 
   async function updateOrderStatus(id, status) {
@@ -607,17 +712,14 @@
     }
   }
 
-  // ── Payments ─────────────────────────────────────────
+  // ── Payments ──────────────────────────────────────────────
   const PAY_STATUS_MAP = {
     pending:  { label: '待支付', cls: 'tag-orange' },
     paid:     { label: '已支付', cls: 'tag-green' },
     expired:  { label: '已过期', cls: 'tag-gray' },
     refunded: { label: '已退款', cls: 'tag-red' }
   };
-  const PAY_METHOD_MAP = {
-    wechat: '💚 微信支付',
-    alipay: '🔵 支付宝'
-  };
+  const PAY_METHOD_MAP = { wechat: '💚 微信支付', alipay: '🔵 支付宝' };
 
   async function loadPayments() {
     try {
@@ -626,32 +728,48 @@
         safeFetch('/api/merchants'),
         safeFetch('/api/stats/summary')
       ]);
+      allPayments = payments;
       const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
       document.getElementById('p-wechat').textContent = `¥${summary.wechat_revenue}`;
       document.getElementById('p-alipay').textContent = `¥${summary.alipay_revenue}`;
       document.getElementById('p-refunds').textContent = payments.filter(p => p.status === 'refunded').length;
-
-      const sorted = [...payments].sort((a, b) => b.id > a.id ? 1 : -1);
-      const tbody = document.getElementById('paymentsTable');
-      if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无支付记录</td></tr>'; return; }
-      tbody.innerHTML = sorted.map(p => {
-        const st = PAY_STATUS_MAP[p.status] || { label: p.status, cls: 'tag-gray' };
-        const refundBtn = p.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${p.id}',${p.amount})">退款</button>` : '';
-        return `
-          <tr>
-            <td style="font-size:11px;color:#999">${p.id}</td>
-            <td>${mMap[p.merchant_id] || '未知'}</td>
-            <td style="color:#f5a01e;font-weight:600">¥${p.amount}</td>
-            <td><span class="pay-method">${PAY_METHOD_MAP[p.method] || p.method}</span></td>
-            <td><span class="tag ${st.cls}">${st.label}</span></td>
-            <td style="font-size:11px;color:#999">${p.transaction_id || '-'}</td>
-            <td style="font-size:11px;color:#999">${p.paid_at ? new Date(p.paid_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : new Date(p.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-            <td class="action-btns">${refundBtn}</td>
-          </tr>`;
-      }).join('');
+      // Populate merchant filter
+      const sel = document.getElementById('payMerchantFilter');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">全部商家</option>' + merchants.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      sel.value = cur;
+      // Store mMap for renderPayments
+      allPayments._mMap = mMap;
+      renderPayments();
     } catch (e) {
       showError('加载支付记录失败');
     }
+  }
+
+  function renderPayments() {
+    const statusFilter = document.getElementById('payStatusFilter').value;
+    const merchantFilter = document.getElementById('payMerchantFilter').value;
+    const mMap = allPayments._mMap || {};
+    let list = [...allPayments].sort((a, b) => b.id > a.id ? 1 : -1);
+    if (statusFilter) list = list.filter(p => p.status === statusFilter);
+    if (merchantFilter) list = list.filter(p => String(p.merchant_id) === merchantFilter);
+    const tbody = document.getElementById('paymentsTable');
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无支付记录</td></tr>'; return; }
+    tbody.innerHTML = list.map(p => {
+      const st = PAY_STATUS_MAP[p.status] || { label: p.status, cls: 'tag-gray' };
+      const refundBtn = p.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${p.id}',${p.amount})">退款</button>` : '';
+      return `
+        <tr>
+          <td style="font-size:11px;color:#999">${p.id}</td>
+          <td>${mMap[p.merchant_id] || '未知'}</td>
+          <td style="color:#f5a01e;font-weight:600">¥${p.amount}</td>
+          <td><span class="pay-method">${PAY_METHOD_MAP[p.method] || p.method}</span></td>
+          <td><span class="tag ${st.cls}">${st.label}</span></td>
+          <td style="font-size:11px;color:#999">${p.transaction_id || '-'}</td>
+          <td style="font-size:11px;color:#999">${p.paid_at ? new Date(p.paid_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : new Date(p.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="action-btns">${refundBtn}</td>
+        </tr>`;
+    }).join('');
   }
 
   function openRefundModal(payId, amount) {
