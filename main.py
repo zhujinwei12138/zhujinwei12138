@@ -2,6 +2,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+from alembic.config import Config as AlembicConfig
+from alembic import command as alembic_command
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
@@ -17,12 +19,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _run_migrations() -> None:
+    """Run pending Alembic migrations synchronously (called at startup)."""
+    cfg = AlembicConfig(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "alembic"))
+    alembic_command.upgrade(cfg, "head")
+    logger.info("Alembic migrations applied")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     # Startup
     rc.init_redis()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Run Alembic in a thread to avoid nested event-loop conflict
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_migrations)
     await seed_if_empty()
     logger.info("Application started")
     yield

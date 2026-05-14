@@ -106,6 +106,24 @@
     .pay-method { display: flex; align-items: center; gap: 6px; font-size: 13px; }
     .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
+    /* ── Mobile responsive ── */
+    .menu-btn { display: none; background: none; border: none; cursor: pointer; font-size: 22px; padding: 4px 8px; color: #333; }
+    @media (max-width: 768px) {
+      body { display: block; }
+      .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; }
+      .topbar { padding: 0 14px; }
+      .content { padding: 16px 14px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .menu-btn { display: inline-flex; align-items: center; }
+      table { font-size: 12px; }
+      th, td { padding: 8px 8px; }
+      .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 9; display: none; }
+      .sidebar-overlay.show { display: block; }
+    }
+
     /* ── Login overlay ── */
     .login-overlay { position: fixed; inset: 0; background: #1e1e40; z-index: 9999; display: flex; align-items: center; justify-content: center; }
     .login-box { background: #fff; border-radius: 16px; padding: 36px 32px; width: 360px; max-width: 92vw; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
@@ -157,7 +175,9 @@
 
 <!-- Main -->
 <div class="main">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
   <div class="topbar">
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <span class="topbar-title" id="topbarTitle">数据概览</span>
     <div class="topbar-right">
       <span class="topbar-badge">🍺 海湾精酿吧系统</span>
@@ -286,6 +306,16 @@
   let merchantsCache = [];
   let charts = {};
 
+  // ── Mobile sidebar ────────────────────────────────────
+  function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+  }
+  function closeSidebar() {
+    document.querySelector('.sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+  }
+
   // ── Auth ─────────────────────────────────────────────
   // NOTE: this is a frontend-only lock; production should use backend JWT/session auth.
   const ADMIN_PASS = 'admin2024';
@@ -350,6 +380,7 @@
     el.classList.add('active');
     document.getElementById('topbarTitle').textContent = sectionTitles[id];
     sectionLoaders[id]?.();
+    closeSidebar();
   }
 
   // ── Dashboard ────────────────────────────────────────
