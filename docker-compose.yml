@@ -3,10 +3,9 @@ version: "3.9"
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://beer:beer@db:5432/beerdb
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
@@ -15,20 +14,23 @@ services:
         condition: service_healthy
     volumes:
       - ./public:/app/public
+    restart: unless-stopped
 
   db:
     image: postgres:16-alpine
+    env_file: .env
     environment:
-      POSTGRES_USER: beer
-      POSTGRES_PASSWORD: beer
-      POSTGRES_DB: beerdb
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U beer -d beerdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -37,6 +39,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  # ── Nginx (TLS termination + reverse proxy) ──────────────
+  # 启动前请先运行 nginx/gen-self-signed.sh 生成证书（或配置 Let's Encrypt）
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/certbot:/var/www/certbot:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    profiles:
+      - prod   # 仅在 docker compose --profile prod up 时启动
 
 volumes:
   pgdata:

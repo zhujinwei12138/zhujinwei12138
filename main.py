@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 from alembic.config import Config as AlembicConfig
@@ -8,6 +9,7 @@ from alembic import command as alembic_command
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pythonjsonlogger import jsonlogger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,10 +18,21 @@ import redis_client as rc
 from routers import admin_auth, merchants, orders, payments, products, stats
 from seed import seed_if_empty
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+
+def _setup_logging() -> None:
+    """配置结构化 JSON 日志，便于接入 ELK/Loki 等日志平台。"""
+    handler = logging.StreamHandler()
+    formatter = jsonlogger.JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
+
+
+_setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +71,17 @@ app.add_middleware(
 )
 
 
+# ── Trace ID ──────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_trace_id(request: Request, call_next):
+    """每个请求生成唯一 trace_id，写入 response header 便于日志关联。"""
+    trace_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+    request.state.trace_id = trace_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = trace_id
+    return response
+
+
 # ── Security headers ─────────────────────────────────────────────
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
@@ -73,12 +97,16 @@ async def security_headers(request: Request, call_next):
 async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
+    trace_id = getattr(request.state, "trace_id", "-")
     logger.info(
-        "%s %s %d %.0fms",
-        request.method,
-        request.url.path,
-        response.status_code,
-        (time.time() - start) * 1000,
+        "http_request",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "ms": round((time.time() - start) * 1000),
+            "trace_id": trace_id,
+        },
     )
     return response
 

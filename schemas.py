@@ -4,6 +4,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Product ────────────────────────────────────────────────
+class ProductIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = ""
+    volume: str = Field("", max_length=20)
+    alcohol: str = Field("", max_length=10)
+    price: float = Field(..., gt=0)
+    category: Literal["精酿", "瓶装", "罐装"]
+    badge: Optional[str] = Field(None, max_length=20)
+    gradient: str = ""
+    stock: Optional[int] = Field(None, ge=0)  # None = 不限库存
+
+
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -15,6 +27,7 @@ class ProductOut(BaseModel):
     category: str
     badge: Optional[str]
     gradient: str
+    stock: Optional[int]
 
 
 # ── Merchant ───────────────────────────────────────────────

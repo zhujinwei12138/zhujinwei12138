@@ -19,6 +19,7 @@ class Product(Base):
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     badge: Mapped[Optional[str]] = mapped_column(String(20))
     gradient: Mapped[str] = mapped_column(Text, default="")
+    stock: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # None = unlimited
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

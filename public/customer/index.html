@@ -146,6 +146,19 @@
     .btn-confirm-table { background: #f5a01e; color: #fff; }
     .btn-cancel-table { background: #f0f0f5; color: #666; }
 
+    /* ── Order History ── */
+    .history-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 450; display: none; align-items: flex-end; justify-content: center; }
+    .history-overlay.show { display: flex; }
+    .history-drawer { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px 16px 32px; max-height: 70vh; overflow-y: auto; }
+    .history-handle { width: 36px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 16px; }
+    .history-title { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+    .history-item { padding: 12px; background: #f8f8fc; border-radius: 12px; margin-bottom: 10px; }
+    .history-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .history-item-no { font-size: 12px; color: #999; }
+    .history-item-amount { color: #f5a01e; font-weight: 700; font-size: 15px; }
+    .history-item-goods { font-size: 12px; color: #888; }
+    .history-close-btn { width: 100%; padding: 12px; background: #f0f0f5; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; color: #666; margin-top: 8px; }
+
     /* ── Toast ── */
     .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); background: rgba(0,0,0,0.75); color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.2s; pointer-events: none; }
     .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -166,6 +179,8 @@
         <span class="status-text">营业中</span>
         <span class="status-text">•</span>
         <span class="change-link" onclick="showTableModal()">更换桌号</span>
+        <span class="status-text">·</span>
+        <span class="change-link" onclick="showOrderHistory()">我的订单</span>
       </div>
     </div>
     <div class="header-right">
@@ -283,6 +298,16 @@
   </div>
 </div>
 
+<!-- Order History Drawer -->
+<div class="history-overlay" id="historyOverlay" onclick="onHistoryOverlayClick(event)">
+  <div class="history-drawer" id="historyDrawer">
+    <div class="history-handle"></div>
+    <div class="history-title">📋 本桌订单记录</div>
+    <div id="historyList"><div style="text-align:center;padding:30px;color:#bbb">加载中…</div></div>
+    <button class="history-close-btn" onclick="closeOrderHistory()">关闭</button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -382,13 +407,19 @@
     const container = document.getElementById('products');
     if (!list.length) { container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">暂无商品</div>'; return; }
     const emojiMap = { '精酿': '🍺', '瓶装': '🍾', '罐装': '🥫' };
-    container.innerHTML = list.map(p => `
-      <div class="product-card">
+    container.innerHTML = list.map(p => {
+      const soldOut = p.stock !== null && p.stock !== undefined && p.stock === 0;
+      const lowStock = !soldOut && p.stock !== null && p.stock !== undefined && p.stock <= 5;
+      const stockTag = soldOut
+        ? '<span class="badge" style="background:#e53935">售罄</span>'
+        : (lowStock ? `<span class="badge" style="background:#ff6f00">仅剩${p.stock}</span>` : '');
+      return `
+      <div class="product-card" style="${soldOut ? 'opacity:0.6' : ''}">
         <div class="product-img-wrap">
           <div class="product-img" style="background:${escapeHtml(p.gradient)}">
             <span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emojiMap[p.category] || '🍺'}</span>
           </div>
-          ${p.badge ? `<span class="badge">${escapeHtml(p.badge)}</span>` : ''}
+          ${p.badge && !soldOut && !lowStock ? `<span class="badge">${escapeHtml(p.badge)}</span>` : stockTag || (p.badge ? `<span class="badge">${escapeHtml(p.badge)}</span>` : '')}
         </div>
         <div class="product-info">
           <div class="product-name">${escapeHtml(p.name)}</div>
@@ -396,11 +427,13 @@
           <div class="product-meta">${escapeHtml(p.volume)} · 酒精度 ${escapeHtml(p.alcohol)}</div>
           <div class="product-footer">
             <span class="product-price">¥${escapeHtml(String(p.price))}</span>
-            <button class="add-btn" onclick="addToCart(${Number(p.id)})">+</button>
+            ${soldOut
+              ? '<span style="font-size:13px;color:#bbb;font-weight:600">已售罄</span>'
+              : `<button class="add-btn" onclick="addToCart(${Number(p.id)})">+</button>`}
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   // ── Cart ─────────────────────────────────────────────────
@@ -677,6 +710,55 @@
     el.textContent = msg;
     el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  // ── Order History ─────────────────────────────────────────
+  const ORDER_HISTORY_STATUS = {
+    pending_payment: '待支付', paid: '已支付', preparing: '备餐中',
+    completed: '已完成', refunded: '已退款', cancelled: '已取消',
+  };
+
+  async function showOrderHistory() {
+    const tableNo = localStorage.getItem('tableNo_' + MERCHANT_ID);
+    if (!tableNo) { showToast('请先设置桌号'); return; }
+    document.getElementById('historyOverlay').style.display = 'flex';
+    requestAnimationFrame(() => document.getElementById('historyOverlay').classList.add('show'));
+    const list = document.getElementById('historyList');
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">加载中…</div>';
+    try {
+      const res = await fetch(`/api/orders/by-table?merchant_id=${MERCHANT_ID}&table_no=${encodeURIComponent(tableNo)}&limit=10`);
+      if (!res.ok) throw new Error();
+      const orders = await res.json();
+      if (!orders.length) { list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">暂无订单记录</div>'; return; }
+      list.innerHTML = orders.map(o => {
+        const goods = o.items.map(i => `${i.name}×${i.quantity}`).join('、');
+        const statusLabel = ORDER_HISTORY_STATUS[o.status] || o.status;
+        const statusColor = { completed: '#2e7d32', preparing: '#6a1b9a', paid: '#1565c0', refunded: '#c62828' }[o.status] || '#e65100';
+        return `<div class="history-item">
+          <div class="history-item-header">
+            <span class="history-item-no">订单 #${String(o.id).slice(-6)} · ${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+            <span style="font-size:12px;font-weight:600;color:${statusColor}">${statusLabel}</span>
+          </div>
+          <div class="history-item-goods">${escapeHtml(goods)}</div>
+          <div class="history-item-header" style="margin-top:6px">
+            <span class="history-item-goods">共 ${o.items.reduce((s,i)=>s+i.quantity,0)} 件</span>
+            <span class="history-item-amount">¥${o.total}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch {
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">加载失败，请重试</div>';
+    }
+  }
+
+  function closeOrderHistory() {
+    const el = document.getElementById('historyOverlay');
+    el.classList.remove('show');
+    setTimeout(() => { el.style.display = 'none'; }, 280);
+  }
+
+  function onHistoryOverlayClick(e) {
+    if (e.target === document.getElementById('historyOverlay')) closeOrderHistory();
   }
 
   // ── Init ──────────────────────────────────────────────────

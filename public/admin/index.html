@@ -182,6 +182,7 @@
     <div class="nav-item active" onclick="switchSection('dashboard', this)"><span class="icon">📊</span> 数据概览</div>
     <div class="nav-item" onclick="switchSection('stats', this)"><span class="icon">📈</span> 商家销售统计</div>
     <div class="nav-item" onclick="switchSection('merchants', this)"><span class="icon">🏪</span> 商家管理</div>
+    <div class="nav-item" onclick="switchSection('products', this)"><span class="icon">🍺</span> 商品管理</div>
     <div class="nav-item" onclick="switchSection('orders', this)"><span class="icon">📋</span> 订单管理</div>
     <div class="nav-item" onclick="switchSection('payments', this)"><span class="icon">💳</span> 支付管理</div>
   </nav>
@@ -248,6 +249,17 @@
         <table>
           <thead><tr><th>商家名称</th><th>联系电话</th><th>地址</th><th>桌台数</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
           <tbody id="merchantsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Products ── -->
+    <div class="section" id="sec-products">
+      <div class="card">
+        <div class="card-header"><span class="card-title">商品列表</span><button class="btn btn-primary" onclick="openProductModal()">+ 新增商品</button></div>
+        <table>
+          <thead><tr><th>名称</th><th>分类</th><th>规格</th><th>酒精度</th><th>价格</th><th>库存</th><th>标签</th><th>操作</th></tr></thead>
+          <tbody id="productsTable"></tbody>
         </table>
       </div>
     </div>
@@ -327,6 +339,50 @@
     <div class="modal-footer">
       <button class="btn btn-cancel" onclick="closeMerchantModal()">取消</button>
       <button class="btn btn-primary" onclick="saveMerchant()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal" style="width:520px">
+    <h3 id="productModalTitle">新增商品</h3>
+    <input type="hidden" id="pEditId">
+    <div class="form-row">
+      <div class="form-group"><label>商品名称 *</label><input type="text" id="p-name" placeholder="例如：海湾精酿IPA"></div>
+      <div class="form-group"><label>分类 *</label>
+        <select id="p-category">
+          <option value="精酿">精酿</option>
+          <option value="瓶装">瓶装</option>
+          <option value="罐装">罐装</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>描述</label><input type="text" id="p-description" placeholder="商品简介"></div>
+    <div class="form-row">
+      <div class="form-group"><label>规格</label><input type="text" id="p-volume" placeholder="500ml"></div>
+      <div class="form-group"><label>酒精度</label><input type="text" id="p-alcohol" placeholder="5.2%"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>价格 (¥) *</label><input type="number" id="p-price" placeholder="38" min="0.01" step="0.01"></div>
+      <div class="form-group"><label>库存（留空=不限）</label><input type="number" id="p-stock" placeholder="不限" min="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>标签（可选）</label><input type="text" id="p-badge" placeholder="新品 / 热销 / 推荐"></div>
+      <div class="form-group"><label>渐变色</label>
+        <select id="p-gradient">
+          <option value="linear-gradient(135deg,#1a1a2e,#16213e)">深海蓝</option>
+          <option value="linear-gradient(135deg,#2d5016,#4a8522)">森林绿</option>
+          <option value="linear-gradient(135deg,#7b1f00,#c0392b)">暗红</option>
+          <option value="linear-gradient(135deg,#1a0533,#6c3483)">深紫</option>
+          <option value="linear-gradient(135deg,#0d2137,#1a5276)">靛蓝</option>
+          <option value="linear-gradient(135deg,#1b2631,#2e4057)">炭灰</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeProductModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveProduct()">保存</button>
     </div>
   </div>
 </div>
@@ -457,7 +513,7 @@
   }
 
   // ── Navigation ────────────────────────────────────────────
-  const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', orders: '订单管理', payments: '支付管理' };
+  const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', products: '商品管理', orders: '订单管理', payments: '支付管理' };
 
   function switchSection(id, el) {
     clearAutoRefresh();
@@ -469,6 +525,7 @@
     if (id === 'dashboard') loadDashboard();
     else if (id === 'stats') loadStats();
     else if (id === 'merchants') loadMerchants();
+    else if (id === 'products') loadProducts();
     else if (id === 'orders') { loadOrders(); startAutoRefresh(loadOrders); }
     else if (id === 'payments') { loadPayments(); startAutoRefresh(loadPayments); }
     closeSidebar();
@@ -551,6 +608,105 @@
       `).join('');
     } catch (e) {
       showError('加载统计数据失败');
+    }
+  }
+
+  // ── Products ──────────────────────────────────────────────
+  let productsCache = [];
+
+  async function loadProducts() {
+    try {
+      productsCache = await safeFetch('/api/products');
+      const tbody = document.getElementById('productsTable');
+      tbody.innerHTML = productsCache.length ? productsCache.map(p => {
+        const stockLabel = p.stock === null || p.stock === undefined
+          ? '<span class="tag tag-green">不限</span>'
+          : (p.stock === 0 ? '<span class="tag tag-red">售罄</span>' : `<span class="tag tag-orange">${p.stock}</span>`);
+        return `<tr>
+          <td><strong>${p.name}</strong></td>
+          <td><span class="tag tag-blue">${p.category}</span></td>
+          <td style="color:#999">${p.volume || '-'}</td>
+          <td style="color:#999">${p.alcohol || '-'}</td>
+          <td style="color:#f5a01e;font-weight:600">¥${p.price}</td>
+          <td>${stockLabel}</td>
+          <td>${p.badge ? `<span class="tag tag-purple">${p.badge}</span>` : '-'}</td>
+          <td class="action-btns">
+            <button class="btn btn-edit btn-sm" onclick="editProduct(${p.id})">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">删除</button>
+          </td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="8" class="empty">暂无商品</td></tr>';
+    } catch (e) {
+      showError('加载商品列表失败');
+    }
+  }
+
+  function openProductModal() {
+    ['pEditId','p-name','p-description','p-volume','p-alcohol','p-price','p-stock','p-badge'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('p-category').value = '精酿';
+    document.getElementById('p-gradient').value = 'linear-gradient(135deg,#1a1a2e,#16213e)';
+    document.getElementById('productModalTitle').textContent = '新增商品';
+    document.getElementById('productModal').classList.add('show');
+  }
+
+  function editProduct(id) {
+    const p = productsCache.find(p => p.id === id);
+    if (!p) return;
+    document.getElementById('pEditId').value = p.id;
+    document.getElementById('p-name').value = p.name;
+    document.getElementById('p-description').value = p.description || '';
+    document.getElementById('p-volume').value = p.volume || '';
+    document.getElementById('p-alcohol').value = p.alcohol || '';
+    document.getElementById('p-price').value = p.price;
+    document.getElementById('p-stock').value = p.stock !== null && p.stock !== undefined ? p.stock : '';
+    document.getElementById('p-badge').value = p.badge || '';
+    document.getElementById('p-category').value = p.category;
+    document.getElementById('p-gradient').value = p.gradient || 'linear-gradient(135deg,#1a1a2e,#16213e)';
+    document.getElementById('productModalTitle').textContent = '编辑商品';
+    document.getElementById('productModal').classList.add('show');
+  }
+
+  function closeProductModal() { document.getElementById('productModal').classList.remove('show'); }
+
+  async function saveProduct() {
+    const name = document.getElementById('p-name').value.trim();
+    const price = parseFloat(document.getElementById('p-price').value);
+    if (!name) { alert('请输入商品名称'); return; }
+    if (!price || price <= 0) { alert('请输入有效价格'); return; }
+    const stockVal = document.getElementById('p-stock').value.trim();
+    const payload = {
+      name,
+      description: document.getElementById('p-description').value.trim(),
+      volume: document.getElementById('p-volume').value.trim(),
+      alcohol: document.getElementById('p-alcohol').value.trim(),
+      price,
+      category: document.getElementById('p-category').value,
+      badge: document.getElementById('p-badge').value.trim() || null,
+      gradient: document.getElementById('p-gradient').value,
+      stock: stockVal === '' ? null : parseInt(stockVal),
+    };
+    const id = document.getElementById('pEditId').value;
+    try {
+      await safeFetch(id ? `/api/products/${id}` : '/api/products', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      closeProductModal();
+      loadProducts();
+    } catch (e) {
+      showError('保存失败，请重试');
+    }
+  }
+
+  async function deleteProduct(id) {
+    const p = productsCache.find(p => p.id === id);
+    if (!confirm(`确定删除商品「${p?.name}」？此操作不可恢复。`)) return;
+    try {
+      await safeFetch(`/api/products/${id}`, { method: 'DELETE' });
+      loadProducts();
+    } catch (e) {
+      showError('删除失败，请重试');
     }
   }
 
