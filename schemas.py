@@ -28,6 +28,7 @@ class ProductOut(BaseModel):
     badge: Optional[str]
     gradient: str
     stock: Optional[int]
+    image_url: Optional[str] = None
 
 
 # ── Merchant ───────────────────────────────────────────────
@@ -64,6 +65,7 @@ class OrderIn(BaseModel):
     table_no: str = Field(..., min_length=1, max_length=20)
     items: list[OrderItem] = Field(..., min_length=1)
     total: float = Field(..., gt=0)
+    customer_id: Optional[str] = None  # set by frontend when customer is logged in
 
 
 class OrderStatusIn(BaseModel):
@@ -133,3 +135,38 @@ class SummaryStats(BaseModel):
     today_orders: int
     wechat_revenue: float
     alipay_revenue: float
+
+
+# ── Customer ───────────────────────────────────────────────
+class CustomerSendOTP(BaseModel):
+    phone: str = Field(..., min_length=8, max_length=20)
+
+
+class CustomerVerifyOTP(BaseModel):
+    phone: str = Field(..., min_length=8, max_length=20)
+    code: str = Field(..., min_length=4, max_length=8)
+
+
+class CustomerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    phone: str
+    created_at: datetime
+
+
+# ── AdminUser ──────────────────────────────────────────────
+class AdminUserIn(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
+    role: Literal["super_admin", "merchant_admin"] = "merchant_admin"
+    merchant_id: Optional[int] = None
+
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    role: str
+    merchant_id: Optional[int]
+    is_active: bool
+    created_at: datetime

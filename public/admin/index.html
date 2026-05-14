@@ -185,6 +185,7 @@
     <div class="nav-item" onclick="switchSection('products', this)"><span class="icon">🍺</span> 商品管理</div>
     <div class="nav-item" onclick="switchSection('orders', this)"><span class="icon">📋</span> 订单管理</div>
     <div class="nav-item" onclick="switchSection('payments', this)"><span class="icon">💳</span> 支付管理</div>
+    <div class="nav-item" onclick="switchSection('admins', this)"><span class="icon">👥</span> 管理员账号</div>
   </nav>
   <div class="sidebar-footer">🔒 管理员 · admin <span onclick="doLogout()" style="cursor:pointer;color:#f5a01e;margin-left:8px">[退出]</span></div>
 </aside>
@@ -319,6 +320,32 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Admin User Modal -->
+<div class="modal-overlay" id="adminUserModal">
+  <div class="modal">
+    <h3 id="adminUserModalTitle">新建管理员</h3>
+    <input type="hidden" id="adminEditId">
+    <div class="form-row">
+      <div class="form-group"><label>用户名 *</label><input type="text" id="au-username" placeholder="3-50个字符"></div>
+      <div class="form-group"><label>密码 *</label><input type="password" id="au-password" placeholder="至少6位"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>角色 *</label>
+        <select id="au-role">
+          <option value="merchant_admin">商家管理员</option>
+          <option value="super_admin">超级管理员</option>
+        </select>
+      </div>
+      <div class="form-group"><label>关联商家ID（商家管理员必填）</label><input type="number" id="au-merchantId" placeholder="商家ID"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAdminUserModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveAdminUser()">保存</button>
+    </div>
   </div>
 </div>
 
@@ -513,7 +540,7 @@
   }
 
   // ── Navigation ────────────────────────────────────────────
-  const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', products: '商品管理', orders: '订单管理', payments: '支付管理' };
+  const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', products: '商品管理', orders: '订单管理', payments: '支付管理', admins: '管理员账号' };
 
   function switchSection(id, el) {
     clearAutoRefresh();
@@ -528,6 +555,7 @@
     else if (id === 'products') loadProducts();
     else if (id === 'orders') { loadOrders(); startAutoRefresh(loadOrders); }
     else if (id === 'payments') { loadPayments(); startAutoRefresh(loadPayments); }
+    else if (id === 'admins') loadAdminUsers();
     closeSidebar();
   }
 
@@ -632,6 +660,7 @@
           <td>${p.badge ? `<span class="tag tag-purple">${p.badge}</span>` : '-'}</td>
           <td class="action-btns">
             <button class="btn btn-edit btn-sm" onclick="editProduct(${p.id})">编辑</button>
+            <button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32" onclick="openProductImageUpload(${p.id},'${escapeHtml(p.name)}')">🖼 图片</button>
             <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">删除</button>
           </td>
         </tr>`;
@@ -947,6 +976,120 @@
     } catch (e) {
       showError('退款失败，请重试');
     }
+  }
+
+  // ── Admin Users ───────────────────────────────────────────
+  let allAdminUsers = [];
+
+  async function loadAdminUsers() {
+    try {
+      allAdminUsers = await safeFetch('/api/admin/users');
+      renderAdminUsers();
+    } catch (e) {
+      document.getElementById('adminUsersTable').innerHTML =
+        '<tr><td colspan="7" style="text-align:center;color:#bbb">加载失败（需超级管理员权限）</td></tr>';
+    }
+  }
+
+  function renderAdminUsers() {
+    const roleLabel = { super_admin: '超级管理员', merchant_admin: '商家管理员' };
+    document.getElementById('adminUsersTable').innerHTML = allAdminUsers.map(u => `
+      <tr>
+        <td>${u.id}</td>
+        <td><strong>${escapeHtml(u.username)}</strong></td>
+        <td><span style="background:${u.role==='super_admin'?'#fff3cd':'#e8f4fd'};color:${u.role==='super_admin'?'#856404':'#1565c0'};padding:2px 8px;border-radius:10px;font-size:12px">${roleLabel[u.role]||u.role}</span></td>
+        <td>${u.merchant_id || '—'}</td>
+        <td><span style="color:${u.is_active?'#2e7d32':'#c62828'}">${u.is_active?'启用':'停用'}</span></td>
+        <td>${new Date(u.created_at).toLocaleString('zh-CN')}</td>
+        <td>
+          <button class="btn btn-sm" onclick="editAdminUser(${u.id})">编辑</button>
+          <button class="btn btn-sm" style="background:#fce4ec;color:#c62828" onclick="deleteAdminUser(${u.id},'${escapeHtml(u.username)}')">删除</button>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:#bbb">暂无数据</td></tr>';
+  }
+
+  function openAdminUserModal() {
+    document.getElementById('adminUserModalTitle').textContent = '新建管理员';
+    document.getElementById('adminEditId').value = '';
+    document.getElementById('au-username').value = '';
+    document.getElementById('au-password').value = '';
+    document.getElementById('au-role').value = 'merchant_admin';
+    document.getElementById('au-merchantId').value = '';
+    document.getElementById('adminUserModal').classList.add('show');
+  }
+
+  function closeAdminUserModal() {
+    document.getElementById('adminUserModal').classList.remove('show');
+  }
+
+  function editAdminUser(id) {
+    const u = allAdminUsers.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('adminUserModalTitle').textContent = '编辑管理员';
+    document.getElementById('adminEditId').value = u.id;
+    document.getElementById('au-username').value = u.username;
+    document.getElementById('au-password').value = '';
+    document.getElementById('au-role').value = u.role;
+    document.getElementById('au-merchantId').value = u.merchant_id || '';
+    document.getElementById('adminUserModal').classList.add('show');
+  }
+
+  async function saveAdminUser() {
+    const editId = document.getElementById('adminEditId').value;
+    const username = document.getElementById('au-username').value.trim();
+    const password = document.getElementById('au-password').value;
+    const role = document.getElementById('au-role').value;
+    const merchantId = document.getElementById('au-merchantId').value;
+    if (!username || !password) { alert('请填写用户名和密码'); return; }
+    const body = { username, password, role, merchant_id: merchantId ? Number(merchantId) : null };
+    try {
+      if (editId) {
+        await safeFetch(`/api/admin/users/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } else {
+        await safeFetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      closeAdminUserModal();
+      loadAdminUsers();
+    } catch (e) {
+      alert('保存失败，请检查权限或输入');
+    }
+  }
+
+  async function deleteAdminUser(id, username) {
+    if (!confirm(`确认删除管理员「${username}」？`)) return;
+    try {
+      await safeFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      loadAdminUsers();
+    } catch (e) {
+      alert('删除失败');
+    }
+  }
+
+  // ── Product image upload ─────────────────────────────────
+  function openProductImageUpload(productId, productName) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const token = localStorage.getItem('adminToken');
+        const res = await fetch(`/api/products/${productId}/image`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showSuccess(`「${productName}」图片已更新`);
+        loadProducts();
+      } catch (e) {
+        alert('图片上传失败：' + e.message);
+      }
+    };
+    input.click();
   }
 
   checkAuth();

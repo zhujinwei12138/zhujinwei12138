@@ -1,7 +1,9 @@
 import json
 import logging
+import os
+import secrets
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,10 +18,12 @@ logger = logging.getLogger(__name__)
 
 CACHE_TTL = 300  # 5 minutes
 _CACHE_PATTERN = "products:*"
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "uploads")
 
 
 async def _invalidate_product_cache() -> None:
-    """清除所有商品缓存键。"""
     keys = await rc.redis.keys(_CACHE_PATTERN)
     if keys:
         await rc.redis.delete(*keys)
@@ -65,6 +69,45 @@ async def update_product(product_id: int, body: ProductIn, db: AsyncSession = De
     await db.refresh(product)
     await _invalidate_product_cache()
     logger.info("Product updated: id=%s", product_id)
+    return product
+
+
+@router.post("/{product_id}/image", response_model=ProductOut, dependencies=[Depends(verify_admin)])
+async def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    product = await db.get(Product, product_id)
+    if not product:
+        raise HTTPException(404, "Product not found")
+
+    content_type = file.content_type or ""
+    if content_type not in _ALLOWED_MIME:
+        raise HTTPException(400, "仅支持 JPEG / PNG / WebP / GIF 格式")
+
+    content = await file.read()
+    if len(content) > _MAX_SIZE:
+        raise HTTPException(400, "图片大小不能超过 5 MB")
+
+    os.makedirs(_UPLOAD_DIR, exist_ok=True)
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
+    filename = f"product_{product_id}_{secrets.token_hex(4)}{ext}"
+    filepath = os.path.join(_UPLOAD_DIR, filename)
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Remove old image file if exists
+    if product.image_url:
+        old_path = os.path.join(_UPLOAD_DIR, os.path.basename(product.image_url))
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    product.image_url = f"/uploads/{filename}"
+    await db.commit()
+    await db.refresh(product)
+    await _invalidate_product_cache()
+    logger.info("Product image uploaded: id=%s url=%s", product_id, product.image_url)
     return product
 
 

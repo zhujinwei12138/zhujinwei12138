@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import engine, Base, get_db
 import redis_client as rc
-from routers import admin_auth, merchants, orders, payments, products, stats
+from routers import admin_auth, customers, merchants, orders, payments, products, stats
 from seed import seed_if_empty
 
 
@@ -124,9 +124,15 @@ app.include_router(products.router)
 app.include_router(merchants.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
+app.include_router(customers.router)
 app.include_router(stats.router)
 
-# Static frontends — mounted AFTER API routes so /api/* is never shadowed
+# Static files
 _base = os.path.dirname(__file__)
+_uploads_dir = os.path.join(_base, "public", "uploads")
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
+
+# Static frontends — mounted AFTER API routes so /api/* is never shadowed
 app.mount("/customer", StaticFiles(directory=os.path.join(_base, "public/customer"), html=True), name="customer")
 app.mount("/admin", StaticFiles(directory=os.path.join(_base, "public/admin"), html=True), name="admin")

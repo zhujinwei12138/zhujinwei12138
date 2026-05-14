@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, func
 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,6 +20,7 @@ class Product(Base):
     badge: Mapped[Optional[str]] = mapped_column(String(20))
     gradient: Mapped[str] = mapped_column(Text, default="")
     stock: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # None = unlimited
+    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -46,6 +47,9 @@ class Order(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     merchant_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("merchants.id", ondelete="RESTRICT"), nullable=False
+    )
+    customer_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("customers.id", ondelete="SET NULL"), nullable=True
     )
     table_no: Mapped[str] = mapped_column(String(20), nullable=False)
     items: Mapped[Any] = mapped_column(JSONB, nullable=False)  # [{id, name, price, quantity}]
@@ -83,3 +87,26 @@ class Payment(Base):
     transaction_id: Mapped[Optional[str]] = mapped_column(String(100))
     refund_reason: Mapped[Optional[str]] = mapped_column(Text)
     gateway: Mapped[Optional[str]] = mapped_column(String(20))
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)  # UUID
+    phone: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+    __table_args__ = (Index("ix_admin_users_username", "username", unique=True),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="merchant_admin")
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.id", ondelete="SET NULL"), nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

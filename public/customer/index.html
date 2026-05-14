@@ -164,6 +164,25 @@
     .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
     .spacer { height: 80px; }
+
+    /* ── Phone Login Modal ── */
+    .login-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 510; display: none; align-items: center; justify-content: center; }
+    .login-modal-overlay.show { display: flex; }
+    .login-modal { background: #fff; border-radius: 18px; width: 300px; max-width: 90vw; padding: 28px 24px; }
+    .login-modal h3 { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+    .login-modal p { color: #888; font-size: 13px; margin-bottom: 18px; }
+    .login-modal input { width: 100%; padding: 11px 12px; border: 1.5px solid #e0e0e0; border-radius: 10px; font-size: 16px; outline: none; margin-bottom: 10px; }
+    .login-modal input:focus { border-color: #f5a01e; }
+    .otp-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .otp-row input { flex: 1; margin-bottom: 0; }
+    .otp-send-btn { padding: 11px 14px; background: #1e1e40; color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .otp-send-btn:disabled { background: #ccc; cursor: default; }
+    .login-btns { display: flex; gap: 10px; margin-top: 4px; }
+    .login-btns button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .btn-login-confirm { background: #f5a01e; color: #fff; }
+    .btn-login-cancel { background: #f0f0f5; color: #666; }
+    .account-btn { background: rgba(255,255,255,0.1); border: none; border-radius: 8px; padding: 5px 10px; color: rgba(255,255,255,0.8); font-size: 12px; cursor: pointer; margin-right: 4px; }
+    .product-img-photo { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
   </style>
 </head>
 <body>
@@ -181,6 +200,8 @@
         <span class="change-link" onclick="showTableModal()">更换桌号</span>
         <span class="status-text">·</span>
         <span class="change-link" onclick="showOrderHistory()">我的订单</span>
+        <span class="status-text">·</span>
+        <span class="change-link" id="accountLink" onclick="onAccountClick()">登录</span>
       </div>
     </div>
     <div class="header-right">
@@ -308,6 +329,23 @@
   </div>
 </div>
 
+<!-- Phone Login Modal -->
+<div class="login-modal-overlay" id="loginModalOverlay">
+  <div class="login-modal">
+    <h3>📱 手机号登录</h3>
+    <p>登录后可跨设备查询您的订单记录</p>
+    <input type="tel" id="loginPhone" placeholder="请输入手机号" maxlength="20" inputmode="numeric">
+    <div class="otp-row">
+      <input type="text" id="loginOtp" placeholder="验证码" maxlength="6" inputmode="numeric">
+      <button class="otp-send-btn" id="otpSendBtn" onclick="sendOTP()">获取验证码</button>
+    </div>
+    <div class="login-btns">
+      <button class="btn-login-cancel" onclick="closeLoginModal()">取消</button>
+      <button class="btn-login-confirm" onclick="confirmLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -319,10 +357,12 @@
   let currentOrderId = null;
   let pollTimer = null;
   let countdownTimer = null;
-  let orderTrackTimer = null;
+  let orderTrackES = null;  // EventSource for SSE
   let payMethod = 'wechat';
   let qrInstance = null;
   let merchantName = '啤酒小程序';
+  let customerToken = localStorage.getItem('customerToken') || null;
+  let customerPhone = localStorage.getItem('customerPhone') || null;
 
   function escapeHtml(str) {
     return String(str)
@@ -413,12 +453,13 @@
       const stockTag = soldOut
         ? '<span class="badge" style="background:#e53935">售罄</span>'
         : (lowStock ? `<span class="badge" style="background:#ff6f00">仅剩${p.stock}</span>` : '');
+      const imgHtml = p.image_url
+        ? `<img class="product-img-photo" src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.name)}" loading="lazy">`
+        : `<div class="product-img" style="background:${escapeHtml(p.gradient)}"><span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emojiMap[p.category] || '🍺'}</span></div>`;
       return `
       <div class="product-card" style="${soldOut ? 'opacity:0.6' : ''}">
         <div class="product-img-wrap">
-          <div class="product-img" style="background:${escapeHtml(p.gradient)}">
-            <span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emojiMap[p.category] || '🍺'}</span>
-          </div>
+          ${imgHtml}
           ${p.badge && !soldOut && !lowStock ? `<span class="badge">${escapeHtml(p.badge)}</span>` : stockTag || (p.badge ? `<span class="badge">${escapeHtml(p.badge)}</span>` : '')}
         </div>
         <div class="product-info">
@@ -515,7 +556,8 @@
           merchant_id: MERCHANT_ID,
           table_no: tableNo,
           items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
-          total
+          total,
+          customer_id: customerToken ? JSON.parse(atob(customerToken.split('.')[1])).sub : null,
         })
       });
       if (!orderRes.ok) throw new Error(`下单失败 HTTP ${orderRes.status}`);
@@ -677,31 +719,118 @@
   }
 
   function startOrderTracking(orderId) {
-    clearInterval(orderTrackTimer);
+    if (orderTrackES) { orderTrackES.close(); orderTrackES = null; }
     const el = document.getElementById('orderTrackStatus');
     el.textContent = '查询中…';
 
-    async function fetchStatus() {
+    const es = new EventSource(`/api/orders/${orderId}/stream`);
+    orderTrackES = es;
+    es.onmessage = (e) => {
       try {
-        const res = await fetch(`/api/orders/${orderId}/status`);
-        if (!res.ok) return;
-        const o = await res.json();
-        el.textContent = ORDER_STATUS_LABELS[o.status] || o.status;
-        if (o.status === 'completed' || o.status === 'refunded' || o.status === 'cancelled') {
-          clearInterval(orderTrackTimer);
+        const data = JSON.parse(e.data);
+        el.textContent = ORDER_STATUS_LABELS[data.status] || data.status;
+        if (['completed', 'cancelled', 'refunded'].includes(data.status)) {
+          es.close(); orderTrackES = null;
         }
       } catch (_) {}
-    }
-
-    fetchStatus();
-    orderTrackTimer = setInterval(fetchStatus, 10000);
+    };
+    es.onerror = () => {
+      // Fallback to polling if SSE fails
+      es.close(); orderTrackES = null;
+      fetch(`/api/orders/${orderId}/status`)
+        .then(r => r.json())
+        .then(o => { el.textContent = ORDER_STATUS_LABELS[o.status] || o.status; })
+        .catch(() => {});
+    };
   }
 
   function closeSuccess() {
-    clearInterval(orderTrackTimer);
+    if (orderTrackES) { orderTrackES.close(); orderTrackES = null; }
     document.getElementById('successOverlay').classList.remove('show');
     currentPayment = null;
     currentOrderId = null;
+  }
+
+  // ── Customer account (phone login) ───────────────────────
+  function updateAccountUI() {
+    const link = document.getElementById('accountLink');
+    if (customerPhone) {
+      link.textContent = customerPhone.slice(-4).padStart(customerPhone.length, '*');
+    } else {
+      link.textContent = '登录';
+    }
+  }
+
+  function onAccountClick() {
+    if (customerPhone) {
+      if (confirm(`退出登录 ${customerPhone}？`)) {
+        customerToken = null; customerPhone = null;
+        localStorage.removeItem('customerToken');
+        localStorage.removeItem('customerPhone');
+        updateAccountUI();
+        showToast('已退出登录');
+      }
+    } else {
+      document.getElementById('loginPhone').value = '';
+      document.getElementById('loginOtp').value = '';
+      document.getElementById('loginModalOverlay').classList.add('show');
+    }
+  }
+
+  function closeLoginModal() {
+    document.getElementById('loginModalOverlay').classList.remove('show');
+  }
+
+  let otpCooldown = 0;
+  async function sendOTP() {
+    const phone = document.getElementById('loginPhone').value.trim();
+    if (!phone || phone.length < 8) { showToast('请输入正确的手机号'); return; }
+    if (otpCooldown > 0) return;
+    const btn = document.getElementById('otpSendBtn');
+    try {
+      const res = await fetch('/api/customers/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '发送失败');
+      showToast(`验证码已发送${data.demo_code ? '（演示：' + data.demo_code + '）' : ''}`);
+      otpCooldown = 60;
+      const timer = setInterval(() => {
+        otpCooldown--;
+        btn.textContent = otpCooldown > 0 ? `${otpCooldown}s` : '获取验证码';
+        btn.disabled = otpCooldown > 0;
+        if (otpCooldown <= 0) clearInterval(timer);
+      }, 1000);
+      btn.disabled = true;
+    } catch (e) {
+      showToast(e.message || '发送失败，请重试');
+    }
+  }
+
+  async function confirmLogin() {
+    const phone = document.getElementById('loginPhone').value.trim();
+    const code = document.getElementById('loginOtp').value.trim();
+    if (!phone || !code) { showToast('请填写手机号和验证码'); return; }
+    try {
+      const res = await fetch('/api/customers/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, code })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '验证失败');
+      customerToken = data.token;
+      customerPhone = data.customer.phone;
+      localStorage.setItem('customerToken', customerToken);
+      localStorage.setItem('customerPhone', customerPhone);
+      closeLoginModal();
+      updateAccountUI();
+      showToast('登录成功 🎉');
+    } catch (e) {
+      showToast(e.message || '验证失败，请重试');
+    }
   }
 
   // ── Toast ─────────────────────────────────────────────────
@@ -719,16 +848,24 @@
   };
 
   async function showOrderHistory() {
-    const tableNo = localStorage.getItem('tableNo_' + MERCHANT_ID);
-    if (!tableNo) { showToast('请先设置桌号'); return; }
     document.getElementById('historyOverlay').style.display = 'flex';
     requestAnimationFrame(() => document.getElementById('historyOverlay').classList.add('show'));
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">加载中…</div>';
     try {
-      const res = await fetch(`/api/orders/by-table?merchant_id=${MERCHANT_ID}&table_no=${encodeURIComponent(tableNo)}&limit=10`);
-      if (!res.ok) throw new Error();
-      const orders = await res.json();
+      let orders;
+      // Logged-in customers see all their orders across devices
+      if (customerToken) {
+        const res = await fetch(`/api/customers/me/orders?token=${encodeURIComponent(customerToken)}&limit=20`);
+        if (!res.ok) throw new Error();
+        orders = await res.json();
+      } else {
+        const tableNo = localStorage.getItem('tableNo_' + MERCHANT_ID);
+        if (!tableNo) { list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">请先设置桌号，或<a href="#" onclick="onAccountClick()" style="color:#f5a01e">登录</a>查看全部订单</div>'; return; }
+        const res = await fetch(`/api/orders/by-table?merchant_id=${MERCHANT_ID}&table_no=${encodeURIComponent(tableNo)}&limit=10`);
+        if (!res.ok) throw new Error();
+        orders = await res.json();
+      }
       if (!orders.length) { list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">暂无订单记录</div>'; return; }
       list.innerHTML = orders.map(o => {
         const goods = o.items.map(i => `${i.name}×${i.quantity}`).join('、');
@@ -765,6 +902,7 @@
   loadMerchantInfo();
   initTableNo();
   loadProducts();
+  updateAccountUI();
 </script>
 </body>
 </html>

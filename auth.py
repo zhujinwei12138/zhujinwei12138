@@ -1,6 +1,7 @@
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import bcrypt
 import jwt
@@ -12,14 +13,11 @@ ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = int(os.getenv("ADMIN_TOKEN_TTL_HOURS", "8"))
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 
-# Cached bcrypt hash — computed once at first login attempt
 _pass_hash: bytes | None = None
-
 _bearer = HTTPBearer()
 
 
 def _get_pass_hash() -> bytes:
-    """Return bcrypt hash, preferring ADMIN_PASS_HASH over plaintext ADMIN_PASS."""
     global _pass_hash
     if _pass_hash is None:
         stored = os.getenv("ADMIN_PASS_HASH", "")
@@ -31,9 +29,23 @@ def _get_pass_hash() -> bytes:
     return _pass_hash
 
 
-def create_admin_token() -> str:
+def hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt(rounds=12)).decode()
+
+
+def check_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
+        return False
+
+
+def create_admin_token(username: str = "admin", role: str = "super_admin", merchant_id: Optional[int] = None) -> str:
     exp = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
-    return jwt.encode({"sub": "admin", "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+    payload: dict = {"sub": username, "role": role, "exp": exp}
+    if merchant_id is not None:
+        payload["merchant_id"] = merchant_id
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def check_credentials(username: str, password: str) -> bool:
@@ -45,14 +57,27 @@ def check_credentials(username: str, password: str) -> bool:
         return False
 
 
-def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
-    """FastAPI dependency — raises 401 if token is missing, invalid, or expired."""
+def _decode_token(token: str) -> dict:
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("sub") != "admin":
-            raise ValueError("bad sub")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        role = payload.get("role", "")
+        if role not in ("super_admin", "merchant_admin"):
+            raise ValueError("not an admin token")
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired", headers={"WWW-Authenticate": "Bearer"})
     except (jwt.InvalidTokenError, ValueError):
         raise HTTPException(401, "Invalid token", headers={"WWW-Authenticate": "Bearer"})
+
+
+def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
+    """Allows both super_admin and merchant_admin."""
+    return _decode_token(credentials.credentials)
+
+
+def verify_super_admin(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
+    """Allows only super_admin."""
+    payload = _decode_token(credentials.credentials)
+    if payload.get("role") != "super_admin":
+        raise HTTPException(403, "Super admin required")
+    return payload
