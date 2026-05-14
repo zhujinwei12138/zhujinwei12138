@@ -7,148 +7,66 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
-      background: #f0f2f8;
-      display: flex;
-      min-height: 100vh;
-      color: #333;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif; background: #f0f2f8; display: flex; min-height: 100vh; color: #333; }
 
     /* ── Sidebar ── */
-    .sidebar {
-      width: 220px; min-width: 220px;
-      background: #1e1e40;
-      display: flex; flex-direction: column;
-      position: fixed; top: 0; left: 0;
-      height: 100vh; z-index: 10;
-    }
-    .sidebar-logo {
-      padding: 22px 20px 18px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
+    .sidebar { width: 220px; min-width: 220px; background: #1e1e40; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 10; }
+    .sidebar-logo { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); }
     .sidebar-logo h2 { color: #fff; font-size: 16px; font-weight: 700; }
     .sidebar-logo p { color: rgba(255,255,255,0.4); font-size: 12px; margin-top: 3px; }
     .nav-section { padding: 12px 0; }
-    .nav-label {
-      color: rgba(255,255,255,0.3); font-size: 11px;
-      padding: 6px 20px; letter-spacing: 1px; text-transform: uppercase;
-    }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 11px 20px; cursor: pointer;
-      color: rgba(255,255,255,0.6);
-      font-size: 14px; transition: all 0.2s;
-      border-left: 3px solid transparent;
-    }
+    .nav-label { color: rgba(255,255,255,0.3); font-size: 11px; padding: 6px 20px; letter-spacing: 1px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; color: rgba(255,255,255,0.6); font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
     .nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
-    .nav-item.active {
-      background: rgba(245,160,30,0.15);
-      color: #f5a01e;
-      border-left-color: #f5a01e;
-    }
+    .nav-item.active { background: rgba(245,160,30,0.15); color: #f5a01e; border-left-color: #f5a01e; }
     .nav-item .icon { font-size: 17px; width: 22px; text-align: center; }
-    .sidebar-footer {
-      margin-top: auto; padding: 16px 20px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      color: rgba(255,255,255,0.3); font-size: 12px;
-    }
+    .sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.3); font-size: 12px; }
 
     /* ── Main ── */
     .main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; }
-
-    .topbar {
-      background: #fff;
-      padding: 0 28px;
-      height: 58px;
-      display: flex; align-items: center; justify-content: space-between;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-      position: sticky; top: 0; z-index: 5;
-    }
+    .topbar { background: #fff; padding: 0 28px; height: 58px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 4px rgba(0,0,0,0.07); position: sticky; top: 0; z-index: 5; }
     .topbar-title { font-size: 16px; font-weight: 600; color: #1a1a2e; }
     .topbar-right { display: flex; align-items: center; gap: 14px; }
-    .topbar-badge {
-      background: #fff3e0; color: #f5a01e;
-      font-size: 12px; padding: 4px 10px;
-      border-radius: 12px; font-weight: 500;
-    }
-
+    .topbar-badge { background: #fff3e0; color: #f5a01e; font-size: 12px; padding: 4px 10px; border-radius: 12px; font-weight: 500; }
     .content { padding: 24px 28px; }
 
-    /* ── Section ── */
+    /* ── Sections ── */
     .section { display: none; }
     .section.active { display: block; }
 
     /* ── Stat Cards ── */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px; margin-bottom: 24px;
-    }
-    .stat-card {
-      background: #fff; border-radius: 14px;
-      padding: 20px; display: flex; align-items: center; gap: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .stat-icon {
-      width: 48px; height: 48px; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; flex-shrink: 0;
-    }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border-radius: 14px; padding: 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .stat-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
     .stat-info p { color: #888; font-size: 12px; margin-bottom: 4px; }
-    .stat-info h3 { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+    .stat-info h3 { font-size: 22px; font-weight: 700; color: #1a1a2e; }
 
     /* ── Cards ── */
-    .card {
-      background: #fff; border-radius: 14px;
-      padding: 22px; margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .card-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 18px;
-    }
+    .card { background: #fff; border-radius: 14px; padding: 22px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
     .card-title { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
     /* ── Tables ── */
     table { width: 100%; border-collapse: collapse; }
-    th {
-      text-align: left; padding: 10px 14px;
-      background: #f8f8fc; color: #888; font-size: 12px;
-      font-weight: 600; letter-spacing: 0.5px;
-    }
+    th { text-align: left; padding: 10px 14px; background: #f8f8fc; color: #888; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
     th:first-child { border-radius: 8px 0 0 8px; }
     th:last-child { border-radius: 0 8px 8px 0; }
-    td { padding: 13px 14px; border-bottom: 1px solid #f5f5f5; font-size: 14px; }
+    td { padding: 12px 14px; border-bottom: 1px solid #f5f5f5; font-size: 14px; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #fafafe; }
 
-    .tag {
-      display: inline-block; padding: 3px 10px;
-      border-radius: 20px; font-size: 12px; font-weight: 500;
-    }
+    /* ── Tags ── */
+    .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; }
     .tag-green { background: #e8f5e9; color: #2e7d32; }
     .tag-red { background: #ffebee; color: #c62828; }
     .tag-orange { background: #fff3e0; color: #e65100; }
     .tag-blue { background: #e3f2fd; color: #1565c0; }
-
-    .rank-bar {
-      display: flex; align-items: center; gap: 10px;
-    }
-    .rank-progress {
-      flex: 1; height: 6px; background: #f0f0f5;
-      border-radius: 3px; overflow: hidden;
-    }
-    .rank-fill { height: 100%; border-radius: 3px; background: #f5a01e; transition: width 0.6s ease; }
-    .rank-num { font-size: 13px; font-weight: 600; color: #333; min-width: 40px; text-align: right; }
+    .tag-gray { background: #f5f5f5; color: #757575; }
+    .tag-purple { background: #f3e5f5; color: #6a1b9a; }
 
     /* ── Buttons ── */
-    .btn {
-      padding: 8px 16px; border-radius: 8px;
-      border: none; cursor: pointer;
-      font-size: 13px; font-weight: 500;
-      transition: all 0.15s;
-    }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
     .btn-primary { background: #f5a01e; color: #fff; }
     .btn-primary:hover { background: #e09010; }
     .btn-danger { background: #ffebee; color: #c62828; }
@@ -156,41 +74,37 @@
     .btn-edit { background: #e3f2fd; color: #1565c0; }
     .btn-edit:hover { background: #bbdefb; }
     .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-success { background: #e8f5e9; color: #2e7d32; }
+    .btn-success:hover { background: #c8e6c9; }
+
+    /* ── Rank bar ── */
+    .rank-bar { display: flex; align-items: center; gap: 10px; }
+    .rank-progress { flex: 1; height: 6px; background: #f0f0f5; border-radius: 3px; overflow: hidden; }
+    .rank-fill { height: 100%; border-radius: 3px; background: #f5a01e; transition: width 0.6s ease; }
+    .rank-num { font-size: 13px; font-weight: 600; color: #333; min-width: 45px; text-align: right; }
+
+    /* ── Charts ── */
+    .chart-wrap { position: relative; height: 260px; }
 
     /* ── Modal ── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.45); z-index: 1000;
-      display: none; align-items: center; justify-content: center;
-    }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: none; align-items: center; justify-content: center; }
     .modal-overlay.show { display: flex; }
-    .modal {
-      background: #fff; border-radius: 16px;
-      padding: 28px; width: 460px; max-width: 95vw;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    }
+    .modal { background: #fff; border-radius: 16px; padding: 28px; width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
     .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; color: #1a1a2e; }
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
-    .form-group input, .form-group select {
-      width: 100%; padding: 10px 12px;
-      border: 1.5px solid #e8e8ee; border-radius: 8px;
-      font-size: 14px; outline: none;
-      transition: border-color 0.2s;
-    }
-    .form-group input:focus, .form-group select:focus { border-color: #f5a01e; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #e8e8ee; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #f5a01e; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     .btn-cancel { background: #f0f0f5; color: #666; }
 
-    /* ── Charts container ── */
-    .chart-wrap { position: relative; height: 280px; }
-
-    /* ── Order items ── */
-    .order-items-cell { font-size: 12px; color: #888; max-width: 200px; }
-
-    /* ── Empty state ── */
+    .order-items-cell { font-size: 12px; color: #888; max-width: 180px; }
     .empty { text-align: center; padding: 40px; color: #bbb; font-size: 14px; }
+
+    /* ── Payment method icon ── */
+    .pay-method { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -203,18 +117,11 @@
   </div>
   <nav class="nav-section">
     <div class="nav-label">主菜单</div>
-    <div class="nav-item active" onclick="switchSection('dashboard', this)">
-      <span class="icon">📊</span> 数据概览
-    </div>
-    <div class="nav-item" onclick="switchSection('stats', this)">
-      <span class="icon">📈</span> 商家销售统计
-    </div>
-    <div class="nav-item" onclick="switchSection('merchants', this)">
-      <span class="icon">🏪</span> 商家管理
-    </div>
-    <div class="nav-item" onclick="switchSection('orders', this)">
-      <span class="icon">📋</span> 订单管理
-    </div>
+    <div class="nav-item active" onclick="switchSection('dashboard', this)"><span class="icon">📊</span> 数据概览</div>
+    <div class="nav-item" onclick="switchSection('stats', this)"><span class="icon">📈</span> 商家销售统计</div>
+    <div class="nav-item" onclick="switchSection('merchants', this)"><span class="icon">🏪</span> 商家管理</div>
+    <div class="nav-item" onclick="switchSection('orders', this)"><span class="icon">📋</span> 订单管理</div>
+    <div class="nav-item" onclick="switchSection('payments', this)"><span class="icon">💳</span> 支付管理</div>
   </nav>
   <div class="sidebar-footer">🔒 管理员 · admin</div>
 </aside>
@@ -234,65 +141,36 @@
     <!-- ── Dashboard ── -->
     <div class="section active" id="sec-dashboard">
       <div class="stat-grid" id="summaryCards">
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#fff3e0">📦</div>
-          <div class="stat-info"><p>总订单数</p><h3 id="s-orders">-</h3></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fff3e0">💰</div><div class="stat-info"><p>实收总金额</p><h3 id="s-revenue">-</h3></div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#e8f5e9">📦</div><div class="stat-info"><p>已支付订单</p><h3 id="s-paid">-</h3></div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fff8e1">⏳</div><div class="stat-info"><p>待支付订单</p><h3 id="s-pending">-</h3></div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fce4ec">↩️</div><div class="stat-info"><p>已退款金额</p><h3 id="s-refund">-</h3></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">各商家营业额</span></div>
+          <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#e8f5e9">💰</div>
-          <div class="stat-info"><p>总营业额</p><h3 id="s-revenue">-</h3></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#e3f2fd">🏪</div>
-          <div class="stat-info"><p>商家数量</p><h3 id="s-merchants">-</h3></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background:#fce4ec">📅</div>
-          <div class="stat-info"><p>今日订单</p><h3 id="s-today">-</h3></div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">支付方式分布</span></div>
+          <div class="chart-wrap"><canvas id="methodChart"></canvas></div>
         </div>
       </div>
-
       <div class="card">
-        <div class="card-header">
-          <span class="card-title">各商家销售额对比</span>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="revenueChart"></canvas>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">各商家售出杯数对比</span>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="qtyChart"></canvas>
-        </div>
+        <div class="card-header"><span class="card-title">各商家售出杯数</span></div>
+        <div class="chart-wrap"><canvas id="qtyChart"></canvas></div>
       </div>
     </div>
 
     <!-- ── Stats ── -->
     <div class="section" id="sec-stats">
       <div class="card">
-        <div class="card-header">
-          <span class="card-title">商家销售详情</span>
-          <button class="btn btn-primary btn-sm" onclick="loadStats()">🔄 刷新</button>
-        </div>
+        <div class="card-header"><span class="card-title">商家销售详情</span><button class="btn btn-primary btn-sm" onclick="loadStats()">🔄 刷新</button></div>
         <table>
-          <thead>
-            <tr>
-              <th>商家名称</th>
-              <th>订单数</th>
-              <th>售出杯数</th>
-              <th>营业额</th>
-              <th>客单价</th>
-              <th>状态</th>
-            </tr>
-          </thead>
+          <thead><tr><th>商家名称</th><th>订单数</th><th>售出杯数</th><th>营业额</th><th>客单价</th><th>状态</th></tr></thead>
           <tbody id="statsTable"></tbody>
         </table>
       </div>
-
       <div class="card">
         <div class="card-header"><span class="card-title">营业额排名</span></div>
         <div id="rankList"></div>
@@ -302,22 +180,9 @@
     <!-- ── Merchants ── -->
     <div class="section" id="sec-merchants">
       <div class="card">
-        <div class="card-header">
-          <span class="card-title">商家列表</span>
-          <button class="btn btn-primary" onclick="openMerchantModal()">+ 新增商家</button>
-        </div>
+        <div class="card-header"><span class="card-title">商家列表</span><button class="btn btn-primary" onclick="openMerchantModal()">+ 新增商家</button></div>
         <table>
-          <thead>
-            <tr>
-              <th>商家名称</th>
-              <th>联系电话</th>
-              <th>地址</th>
-              <th>桌台数</th>
-              <th>状态</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
+          <thead><tr><th>商家名称</th><th>联系电话</th><th>地址</th><th>桌台数</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
           <tbody id="merchantsTable"></tbody>
         </table>
       </div>
@@ -326,23 +191,26 @@
     <!-- ── Orders ── -->
     <div class="section" id="sec-orders">
       <div class="card">
-        <div class="card-header">
-          <span class="card-title">订单列表</span>
-          <button class="btn btn-primary btn-sm" onclick="loadOrders()">🔄 刷新</button>
-        </div>
+        <div class="card-header"><span class="card-title">订单列表</span><button class="btn btn-primary btn-sm" onclick="loadOrders()">🔄 刷新</button></div>
         <table>
-          <thead>
-            <tr>
-              <th>订单号</th>
-              <th>商家</th>
-              <th>桌号</th>
-              <th>商品</th>
-              <th>金额</th>
-              <th>时间</th>
-              <th>状态</th>
-            </tr>
-          </thead>
+          <thead><tr><th>订单号</th><th>商家</th><th>桌号</th><th>商品</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
           <tbody id="ordersTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Payments ── -->
+    <div class="section" id="sec-payments">
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-icon" style="background:#e8f5e9">💚</div><div class="stat-info"><p>微信支付收款</p><h3 id="p-wechat">-</h3></div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#e3f2fd">🔵</div><div class="stat-info"><p>支付宝收款</p><h3 id="p-alipay">-</h3></div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fce4ec">↩️</div><div class="stat-info"><p>退款笔数</p><h3 id="p-refunds">-</h3></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">支付记录</span><button class="btn btn-primary btn-sm" onclick="loadPayments()">🔄 刷新</button></div>
+        <table>
+          <thead><tr><th>支付单号</th><th>商家</th><th>金额</th><th>方式</th><th>状态</th><th>交易号</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody id="paymentsTable"></tbody>
         </table>
       </div>
     </div>
@@ -356,31 +224,13 @@
     <h3 id="modalTitle">新增商家</h3>
     <input type="hidden" id="editId">
     <div class="form-row">
-      <div class="form-group">
-        <label>商家名称 *</label>
-        <input type="text" id="f-name" placeholder="请输入商家名称">
-      </div>
-      <div class="form-group">
-        <label>联系电话 *</label>
-        <input type="text" id="f-phone" placeholder="请输入电话">
-      </div>
+      <div class="form-group"><label>商家名称 *</label><input type="text" id="f-name" placeholder="请输入商家名称"></div>
+      <div class="form-group"><label>联系电话 *</label><input type="text" id="f-phone" placeholder="请输入电话"></div>
     </div>
-    <div class="form-group">
-      <label>地址</label>
-      <input type="text" id="f-address" placeholder="请输入地址">
-    </div>
+    <div class="form-group"><label>地址</label><input type="text" id="f-address" placeholder="请输入地址"></div>
     <div class="form-row">
-      <div class="form-group">
-        <label>桌台数量</label>
-        <input type="number" id="f-tableCount" placeholder="10" min="1" max="999">
-      </div>
-      <div class="form-group">
-        <label>状态</label>
-        <select id="f-status">
-          <option value="active">营业中</option>
-          <option value="inactive">已关闭</option>
-        </select>
-      </div>
+      <div class="form-group"><label>桌台数量</label><input type="number" id="f-tableCount" placeholder="10" min="1"></div>
+      <div class="form-group"><label>状态</label><select id="f-status"><option value="active">营业中</option><option value="inactive">已关闭</option></select></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-cancel" onclick="closeMerchantModal()">取消</button>
@@ -389,240 +239,278 @@
   </div>
 </div>
 
+<!-- Refund Modal -->
+<div class="modal-overlay" id="refundModal">
+  <div class="modal">
+    <h3>确认退款</h3>
+    <input type="hidden" id="refundPayId">
+    <div class="form-group"><label>退款金额</label><input type="text" id="refundAmount" readonly style="background:#f8f8f8"></div>
+    <div class="form-group"><label>退款原因 *</label><textarea id="refundReason" rows="3" placeholder="请输入退款原因"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeRefundModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmRefund()">确认退款</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let merchantsCache = [];
-  let statsCache = [];
-  let revenueChart = null;
-  let qtyChart = null;
+  let charts = {};
 
-  // ── Navigation ──
+  // ── Navigation ──────────────────────────────────────
+  const sectionLoaders = {
+    dashboard: loadDashboard,
+    stats: loadStats,
+    merchants: loadMerchants,
+    orders: loadOrders,
+    payments: loadPayments
+  };
+  const sectionTitles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', orders: '订单管理', payments: '支付管理' };
+
   function switchSection(id, el) {
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('sec-' + id).classList.add('active');
     el.classList.add('active');
-    const titles = { dashboard: '数据概览', stats: '商家销售统计', merchants: '商家管理', orders: '订单管理' };
-    document.getElementById('topbarTitle').textContent = titles[id];
-    if (id === 'dashboard') loadDashboard();
-    if (id === 'stats') loadStats();
-    if (id === 'merchants') loadMerchants();
-    if (id === 'orders') loadOrders();
+    document.getElementById('topbarTitle').textContent = sectionTitles[id];
+    sectionLoaders[id]?.();
   }
 
-  // ── Dashboard ──
+  // ── Dashboard ────────────────────────────────────────
   async function loadDashboard() {
     const [summary, stats] = await Promise.all([
       fetch('/api/stats/summary').then(r => r.json()),
       fetch('/api/stats').then(r => r.json())
     ]);
-    statsCache = stats;
-    document.getElementById('s-orders').textContent = summary.totalOrders;
-    document.getElementById('s-revenue').textContent = `¥${summary.totalRevenue}`;
-    document.getElementById('s-merchants').textContent = summary.merchantCount;
-    document.getElementById('s-today').textContent = summary.todayOrders;
-    renderCharts(stats);
+    document.getElementById('s-revenue').textContent = `¥${summary.total_revenue}`;
+    document.getElementById('s-paid').textContent = summary.paid_orders;
+    document.getElementById('s-pending').textContent = summary.pending_orders;
+    document.getElementById('s-refund').textContent = `¥${summary.refund_amount}`;
+    renderCharts(stats, summary);
   }
 
-  function renderCharts(stats) {
+  function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+
+  function renderCharts(stats, summary) {
     const labels = stats.map(s => s.name);
-    const revenues = stats.map(s => s.totalRevenue);
-    const quantities = stats.map(s => s.totalQuantity);
-    const colors = ['#f5a01e', '#4a90d9', '#5cb85c', '#d9534f', '#9b59b6'];
+    const revenues = stats.map(s => s.total_revenue);
+    const qtys = stats.map(s => s.total_quantity);
+    const palette = ['#f5a01e', '#4a90d9', '#5cb85c', '#d9534f', '#9b59b6'];
 
-    if (revenueChart) revenueChart.destroy();
-    revenueChart = new Chart(document.getElementById('revenueChart'), {
+    destroyChart('revenue');
+    charts.revenue = new Chart(document.getElementById('revenueChart'), {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: '营业额 (¥)',
-          data: revenues,
-          backgroundColor: colors.slice(0, labels.length),
-          borderRadius: 8,
-          borderSkipped: false
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true, grid: { color: '#f0f0f5' } },
-          x: { grid: { display: false } }
-        }
-      }
+      data: { labels, datasets: [{ label: '营业额(¥)', data: revenues, backgroundColor: palette.slice(0, labels.length), borderRadius: 8, borderSkipped: false }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f0f5' } }, x: { grid: { display: false } } } }
     });
 
-    if (qtyChart) qtyChart.destroy();
-    qtyChart = new Chart(document.getElementById('qtyChart'), {
-      type: 'bar',
+    destroyChart('method');
+    charts.method = new Chart(document.getElementById('methodChart'), {
+      type: 'doughnut',
       data: {
-        labels,
-        datasets: [{
-          label: '售出杯数',
-          data: quantities,
-          backgroundColor: colors.map(c => c + '99'),
-          borderColor: colors,
-          borderWidth: 2,
-          borderRadius: 8,
-          borderSkipped: false
-        }]
+        labels: ['微信支付', '支付宝', '退款'],
+        datasets: [{ data: [summary.wechat_revenue, summary.alipay_revenue, summary.refund_amount], backgroundColor: ['#07c160', '#1677ff', '#ff4d4f'], borderWidth: 0, hoverOffset: 4 }]
       },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true, grid: { color: '#f0f0f5' } },
-          x: { grid: { display: false } }
-        }
-      }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    destroyChart('qty');
+    charts.qty = new Chart(document.getElementById('qtyChart'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '售出杯数', data: qtys, backgroundColor: palette.map(c => c + '99'), borderColor: palette, borderWidth: 2, borderRadius: 8, borderSkipped: false }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f0f5' } }, x: { grid: { display: false } } } }
     });
   }
 
-  // ── Stats ──
+  // ── Stats ────────────────────────────────────────────
   async function loadStats() {
     const stats = await fetch('/api/stats').then(r => r.json());
-    statsCache = stats;
-    const maxRevenue = Math.max(...stats.map(s => s.totalRevenue), 1);
-
+    const maxRevenue = Math.max(...stats.map(s => s.total_revenue), 1);
     document.getElementById('statsTable').innerHTML = stats.map(s => `
       <tr>
         <td><strong>${s.name}</strong></td>
-        <td>${s.orderCount}</td>
-        <td>${s.totalQuantity} 杯</td>
-        <td style="color:#f5a01e;font-weight:600">¥${s.totalRevenue}</td>
-        <td>${s.orderCount ? '¥' + Math.round(s.totalRevenue / s.orderCount) : '-'}</td>
+        <td>${s.order_count}</td>
+        <td>${s.total_quantity} 杯</td>
+        <td style="color:#f5a01e;font-weight:600">¥${s.total_revenue}</td>
+        <td>${s.order_count ? '¥' + Math.round(s.total_revenue / s.order_count) : '-'}</td>
         <td><span class="tag ${s.status === 'active' ? 'tag-green' : 'tag-red'}">${s.status === 'active' ? '营业中' : '已关闭'}</span></td>
       </tr>
     `).join('');
-
     const sorted = [...stats].sort((a, b) => b.totalRevenue - a.totalRevenue);
     document.getElementById('rankList').innerHTML = sorted.map((s, i) => `
       <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5">
-        <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#f5a01e':i===1?'#aaa':i===2?'#cd7f32':'#e8e8f0'};
-             color:${i<3?'#fff':'#888'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">
-          ${i + 1}
-        </div>
+        <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#f5a01e':i===1?'#aaa':i===2?'#cd7f32':'#e8e8f0'};color:${i<3?'#fff':'#888'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${i+1}</div>
         <div style="flex:1">
           <div style="font-size:14px;font-weight:600;margin-bottom:6px">${s.name}</div>
-          <div class="rank-bar">
-            <div class="rank-progress">
-              <div class="rank-fill" style="width:${Math.round(s.totalRevenue/maxRevenue*100)}%"></div>
-            </div>
-            <span class="rank-num">¥${s.totalRevenue}</span>
-          </div>
+          <div class="rank-bar"><div class="rank-progress"><div class="rank-fill" style="width:${Math.round(s.total_revenue/maxRevenue*100)}%"></div></div><span class="rank-num">¥${s.total_revenue}</span></div>
         </div>
       </div>
     `).join('');
   }
 
-  // ── Merchants ──
+  // ── Merchants ────────────────────────────────────────
   async function loadMerchants() {
     merchantsCache = await fetch('/api/merchants').then(r => r.json());
-    renderMerchantsTable();
-  }
-
-  function renderMerchantsTable() {
     const tbody = document.getElementById('merchantsTable');
-    if (!merchantsCache.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无商家</td></tr>';
-      return;
-    }
-    tbody.innerHTML = merchantsCache.map(m => `
+    tbody.innerHTML = merchantsCache.length ? merchantsCache.map(m => `
       <tr>
         <td><strong>${m.name}</strong></td>
         <td>${m.phone || '-'}</td>
         <td>${m.address || '-'}</td>
-        <td>${m.tableCount || '-'} 桌</td>
+        <td>${m.table_count || '-'} 桌</td>
         <td><span class="tag ${m.status === 'active' ? 'tag-green' : 'tag-red'}">${m.status === 'active' ? '营业中' : '已关闭'}</span></td>
-        <td style="color:#999;font-size:12px">${new Date(m.createdAt).toLocaleDateString('zh-CN')}</td>
-        <td>
-          <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})" style="margin-right:6px">编辑</button>
+        <td style="color:#999;font-size:12px">${new Date(m.created_at).toLocaleDateString('zh-CN')}</td>
+        <td class="action-btns">
+          <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})">编辑</button>
           <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">删除</button>
         </td>
       </tr>
-    `).join('');
+    `).join('') : '<tr><td colspan="7" class="empty">暂无商家</td></tr>';
   }
 
-  function openMerchantModal(id) {
-    document.getElementById('modalTitle').textContent = '新增商家';
-    document.getElementById('editId').value = '';
-    document.getElementById('f-name').value = '';
-    document.getElementById('f-phone').value = '';
-    document.getElementById('f-address').value = '';
-    document.getElementById('f-tableCount').value = '';
+  function openMerchantModal() {
+    ['editId','f-name','f-phone','f-address','f-tableCount'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-status').value = 'active';
+    document.getElementById('modalTitle').textContent = '新增商家';
     document.getElementById('merchantModal').classList.add('show');
   }
 
   function editMerchant(id) {
     const m = merchantsCache.find(m => m.id === id);
     if (!m) return;
-    document.getElementById('modalTitle').textContent = '编辑商家';
     document.getElementById('editId').value = m.id;
     document.getElementById('f-name').value = m.name;
     document.getElementById('f-phone').value = m.phone || '';
     document.getElementById('f-address').value = m.address || '';
-    document.getElementById('f-tableCount').value = m.tableCount || '';
+    document.getElementById('f-tableCount').value = m.table_count || '';
     document.getElementById('f-status').value = m.status || 'active';
+    document.getElementById('modalTitle').textContent = '编辑商家';
     document.getElementById('merchantModal').classList.add('show');
   }
 
-  function closeMerchantModal() {
-    document.getElementById('merchantModal').classList.remove('show');
-  }
+  function closeMerchantModal() { document.getElementById('merchantModal').classList.remove('show'); }
 
   async function saveMerchant() {
     const name = document.getElementById('f-name').value.trim();
     if (!name) { alert('请输入商家名称'); return; }
     const id = document.getElementById('editId').value;
-    const payload = {
-      name,
-      phone: document.getElementById('f-phone').value.trim(),
-      address: document.getElementById('f-address').value.trim(),
-      tableCount: parseInt(document.getElementById('f-tableCount').value) || 10,
-      status: document.getElementById('f-status').value
-    };
-    const url = id ? `/api/merchants/${id}` : '/api/merchants';
-    const method = id ? 'PUT' : 'POST';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const payload = { name, phone: document.getElementById('f-phone').value.trim(), address: document.getElementById('f-address').value.trim(), table_count: parseInt(document.getElementById('f-tableCount').value) || 10, status: document.getElementById('f-status').value };
+    await fetch(id ? `/api/merchants/${id}` : '/api/merchants', { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     closeMerchantModal();
     loadMerchants();
   }
 
   async function deleteMerchant(id) {
     const m = merchantsCache.find(m => m.id === id);
-    if (!confirm(`确定删除商家「${m?.name}」？此操作不可恢复。`)) return;
+    if (!confirm(`确定删除商家「${m?.name}」？`)) return;
     await fetch(`/api/merchants/${id}`, { method: 'DELETE' });
     loadMerchants();
   }
 
-  // ── Orders ──
+  // ── Orders ───────────────────────────────────────────
+  const ORDER_STATUS_MAP = {
+    pending_payment: { label: '待支付', cls: 'tag-orange' },
+    paid:            { label: '已支付', cls: 'tag-blue' },
+    preparing:       { label: '备餐中', cls: 'tag-purple' },
+    completed:       { label: '已完成', cls: 'tag-green' },
+    refunded:        { label: '已退款', cls: 'tag-red' },
+    cancelled:       { label: '已取消', cls: 'tag-gray' }
+  };
+
   async function loadOrders() {
     const [orders, merchants] = await Promise.all([
       fetch('/api/orders').then(r => r.json()),
       fetch('/api/merchants').then(r => r.json())
     ]);
     const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
-    const tbody = document.getElementById('ordersTable');
-    if (!orders.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty">暂无订单</td></tr>';
-      return;
-    }
     const sorted = [...orders].sort((a, b) => b.id - a.id);
-    tbody.innerHTML = sorted.map(o => `
-      <tr>
-        <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
-        <td>${mMap[o.merchantId] || '未知商家'}</td>
-        <td><span class="tag tag-blue">桌 ${o.tableNo}</span></td>
-        <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
-        <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
-        <td style="color:#999;font-size:12px">${new Date(o.createdAt).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-        <td><span class="tag tag-green">已支付</span></td>
-      </tr>
-    `).join('');
+    const tbody = document.getElementById('ordersTable');
+    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
+    tbody.innerHTML = sorted.map(o => {
+      const st = ORDER_STATUS_MAP[o.status] || { label: o.status, cls: 'tag-gray' };
+      let actionBtns = '';
+      if (o.status === 'paid') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'preparing')">开始备餐</button>`;
+      if (o.status === 'preparing') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'completed')">标记完成</button>`;
+      return `
+        <tr>
+          <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
+          <td>${mMap[o.merchant_id] || '未知'}</td>
+          <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
+          <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
+          <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
+          <td><span class="tag ${st.cls}">${st.label}</span></td>
+          <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="action-btns">${actionBtns}</td>
+        </tr>`;
+    }).join('');
   }
 
-  // ── Init ──
+  async function updateOrderStatus(id, status) {
+    await fetch(`/api/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    loadOrders();
+  }
+
+  // ── Payments ─────────────────────────────────────────
+  const PAY_STATUS_MAP = {
+    pending:  { label: '待支付', cls: 'tag-orange' },
+    paid:     { label: '已支付', cls: 'tag-green' },
+    expired:  { label: '已过期', cls: 'tag-gray' },
+    refunded: { label: '已退款', cls: 'tag-red' }
+  };
+  const PAY_METHOD_MAP = {
+    wechat: '💚 微信支付',
+    alipay: '🔵 支付宝'
+  };
+
+  async function loadPayments() {
+    const [payments, merchants, summary] = await Promise.all([
+      fetch('/api/payments').then(r => r.json()),
+      fetch('/api/merchants').then(r => r.json()),
+      fetch('/api/stats/summary').then(r => r.json())
+    ]);
+    const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
+    document.getElementById('p-wechat').textContent = `¥${summary.wechat_revenue}`;
+    document.getElementById('p-alipay').textContent = `¥${summary.alipay_revenue}`;
+    document.getElementById('p-refunds').textContent = payments.filter(p => p.status === 'refunded').length;
+
+    const sorted = [...payments].sort((a, b) => b.id > a.id ? 1 : -1);
+    const tbody = document.getElementById('paymentsTable');
+    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无支付记录</td></tr>'; return; }
+    tbody.innerHTML = sorted.map(p => {
+      const st = PAY_STATUS_MAP[p.status] || { label: p.status, cls: 'tag-gray' };
+      const refundBtn = p.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${p.id}',${p.amount})">退款</button>` : '';
+      return `
+        <tr>
+          <td style="font-size:11px;color:#999">${p.id}</td>
+          <td>${mMap[p.merchant_id] || '未知'}</td>
+          <td style="color:#f5a01e;font-weight:600">¥${p.amount}</td>
+          <td><span class="pay-method">${PAY_METHOD_MAP[p.method] || p.method}</span></td>
+          <td><span class="tag ${st.cls}">${st.label}</span></td>
+          <td style="font-size:11px;color:#999">${p.transaction_id || '-'}</td>
+          <td style="font-size:11px;color:#999">${p.paid_at ? new Date(p.paid_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : new Date(p.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="action-btns">${refundBtn}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function openRefundModal(payId, amount) {
+    document.getElementById('refundPayId').value = payId;
+    document.getElementById('refundAmount').value = `¥${amount}`;
+    document.getElementById('refundReason').value = '';
+    document.getElementById('refundModal').classList.add('show');
+  }
+  function closeRefundModal() { document.getElementById('refundModal').classList.remove('show'); }
+
+  async function confirmRefund() {
+    const payId = document.getElementById('refundPayId').value;
+    const reason = document.getElementById('refundReason').value.trim();
+    if (!reason) { alert('请填写退款原因'); return; }
+    const res = await fetch(`/api/payments/${payId}/refund`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+    const data = await res.json();
+    if (data.ok) { closeRefundModal(); loadPayments(); }
+    else alert(data.error || '退款失败');
+  }
+
   loadDashboard();
 </script>
 </body>

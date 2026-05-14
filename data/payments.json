@@ -1,0 +1,88 @@
+[
+  {
+    "id": "PAY1704067200001AA",
+    "orderId": 1704067200001,
+    "merchantId": 1,
+    "amount": 112,
+    "method": "wechat",
+    "status": "paid",
+    "createdAt": "2024-01-01T10:00:00.000Z",
+    "expiredAt": "2024-01-01T10:15:00.000Z",
+    "paidAt": "2024-01-01T10:01:42.000Z",
+    "transactionId": "TXN4067320001"
+  },
+  {
+    "id": "PAY1704153600002BB",
+    "orderId": 1704153600002,
+    "merchantId": 2,
+    "amount": 132,
+    "method": "alipay",
+    "status": "paid",
+    "createdAt": "2024-01-02T14:00:00.000Z",
+    "expiredAt": "2024-01-02T14:15:00.000Z",
+    "paidAt": "2024-01-02T14:02:08.000Z",
+    "transactionId": "TXN4153720002"
+  },
+  {
+    "id": "PAY1704240000003CC",
+    "orderId": 1704240000003,
+    "merchantId": 1,
+    "amount": 116,
+    "method": "wechat",
+    "status": "paid",
+    "createdAt": "2024-01-03T18:00:00.000Z",
+    "expiredAt": "2024-01-03T18:15:00.000Z",
+    "paidAt": "2024-01-03T18:00:55.000Z",
+    "transactionId": "TXN4240120003"
+  },
+  {
+    "id": "PAY1704326400004DD",
+    "orderId": 1704326400004,
+    "merchantId": 3,
+    "amount": 132,
+    "method": "alipay",
+    "status": "refunded",
+    "createdAt": "2024-01-04T20:00:00.000Z",
+    "expiredAt": "2024-01-04T20:15:00.000Z",
+    "paidAt": "2024-01-04T20:01:30.000Z",
+    "transactionId": "TXN4326520004",
+    "refundedAt": "2024-01-04T21:00:00.000Z",
+    "refundReason": "顾客取消订单"
+  },
+  {
+    "id": "PAY1704412800005EE",
+    "orderId": 1704412800005,
+    "merchantId": 2,
+    "amount": 167,
+    "method": "wechat",
+    "status": "paid",
+    "createdAt": "2024-01-05T19:00:00.000Z",
+    "expiredAt": "2024-01-05T19:15:00.000Z",
+    "paidAt": "2024-01-05T19:00:28.000Z",
+    "transactionId": "TXN4412920005"
+  },
+  {
+    "id": "PAY1704499200006FF",
+    "orderId": 1704499200006,
+    "merchantId": 3,
+    "amount": 128,
+    "method": "alipay",
+    "status": "paid",
+    "createdAt": "2024-01-06T16:00:00.000Z",
+    "expiredAt": "2024-01-06T16:15:00.000Z",
+    "paidAt": "2024-01-06T16:01:15.000Z",
+    "transactionId": "TXN4499320006"
+  },
+  {
+    "id": "PAY1704585600007GG",
+    "orderId": 1704585600007,
+    "merchantId": 1,
+    "amount": 104,
+    "method": "wechat",
+    "status": "paid",
+    "createdAt": "2024-01-07T21:00:00.000Z",
+    "expiredAt": "2024-01-07T21:15:00.000Z",
+    "paidAt": "2024-01-07T21:00:47.000Z",
+    "transactionId": "TXN4585720007"
+  }
+]

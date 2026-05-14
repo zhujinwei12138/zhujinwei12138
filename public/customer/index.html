@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>海湾精酿吧</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
       background: #f0f0f5;
       max-width: 480px;
       margin: 0 auto;
@@ -15,231 +16,122 @@
     }
 
     /* ── Header ── */
-    .header {
-      background: #1e1e40;
-      padding: 14px 16px 0;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .header-top {
-      display: flex;
-      align-items: flex-start;
-      margin-bottom: 14px;
-    }
+    .header { background: #1e1e40; padding: 14px 16px 0; position: sticky; top: 0; z-index: 100; }
+    .header-top { display: flex; align-items: flex-start; margin-bottom: 14px; }
     .header-left { flex: 1; }
-    .shop-name { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+    .shop-name { color: #fff; font-size: 20px; font-weight: 700; }
     .shop-meta { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
     .loc-icon { color: #f5a01e; font-size: 12px; }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00d68f; flex-shrink: 0; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00d68f; }
     .status-text { color: #aaa; font-size: 12px; }
-    .dot-sep { color: #555; font-size: 12px; }
     .change-link { color: #f5a01e; font-size: 12px; cursor: pointer; }
     .header-right { display: flex; align-items: center; gap: 10px; }
-    .table-badge {
-      background: #f5a01e;
-      border-radius: 10px;
-      padding: 5px 12px;
-      text-align: center;
-      min-width: 54px;
-    }
+    .table-badge { background: #f5a01e; border-radius: 10px; padding: 5px 12px; text-align: center; min-width: 54px; }
     .table-label { color: rgba(255,255,255,0.85); font-size: 11px; }
     .table-num { color: #fff; font-size: 22px; font-weight: 800; line-height: 1.1; }
-    .settings-btn {
-      background: rgba(255,255,255,0.1);
-      border: none;
-      border-radius: 50%;
-      width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: #aaa; font-size: 16px;
-    }
+    .settings-btn { background: rgba(255,255,255,0.1); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #aaa; font-size: 16px; }
 
     /* ── Category Tabs ── */
-    .categories {
-      display: flex;
-      gap: 8px;
-      padding: 0 16px 14px;
-      overflow-x: auto;
-      background: #1e1e40;
-    }
+    .categories { display: flex; gap: 8px; padding: 0 16px 14px; overflow-x: auto; background: #1e1e40; }
     .categories::-webkit-scrollbar { display: none; }
-    .cat-btn {
-      padding: 7px 18px;
-      border-radius: 20px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: background 0.2s, color 0.2s;
-      background: rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.7);
-    }
-    .cat-btn.active {
-      background: #f5a01e;
-      color: #fff;
-    }
+    .cat-btn { padding: 7px 18px; border-radius: 20px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; transition: background 0.2s, color 0.2s; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+    .cat-btn.active { background: #f5a01e; color: #fff; }
 
-    /* ── Product Grid ── */
-    .products {
-      padding: 14px 12px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    .product-card {
-      background: #fff;
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      transition: transform 0.15s;
-    }
+    /* ── Products ── */
+    .products { padding: 14px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .product-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
     .product-card:active { transform: scale(0.97); }
     .product-img-wrap { position: relative; }
-    .product-img {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 64px;
-    }
-    .badge {
-      position: absolute;
-      top: 8px; left: 8px;
-      background: #f5a01e;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-      letter-spacing: 0.5px;
-    }
+    .product-img { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; }
+    .badge { position: absolute; top: 8px; left: 8px; background: #f5a01e; color: #fff; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
     .product-info { padding: 10px 10px 12px; }
     .product-name { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
-    .product-desc {
-      font-size: 12px; color: #999;
-      overflow: hidden; text-overflow: ellipsis;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      line-height: 1.4; margin-bottom: 5px;
-    }
+    .product-desc { font-size: 12px; color: #999; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; margin-bottom: 5px; }
     .product-meta { font-size: 12px; color: #c0c0c0; margin-bottom: 8px; }
     .product-footer { display: flex; align-items: center; justify-content: space-between; }
     .product-price { color: #f5a01e; font-size: 19px; font-weight: 700; }
-    .add-btn {
-      width: 30px; height: 30px;
-      background: #f5a01e;
-      border: none; border-radius: 50%;
-      color: #fff; font-size: 22px;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      line-height: 1; transition: transform 0.1s;
-      box-shadow: 0 2px 6px rgba(245,160,30,0.4);
-    }
+    .add-btn { width: 30px; height: 30px; background: #f5a01e; border: none; border-radius: 50%; color: #fff; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(245,160,30,0.4); }
     .add-btn:active { transform: scale(0.88); }
 
     /* ── Cart Bar ── */
-    .cart-bar {
-      position: fixed;
-      bottom: 0;
-      left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 480px;
-      background: #1e1e40;
-      padding: 10px 16px;
-      display: flex; align-items: center; gap: 12px;
-      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-      z-index: 90;
-    }
+    .cart-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: #1e1e40; padding: 10px 16px; display: flex; align-items: center; gap: 12px; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); z-index: 90; }
     .cart-bar.hidden { transform: translateX(-50%) translateY(110%); }
     .cart-icon-wrap { position: relative; cursor: pointer; }
     .cart-icon { font-size: 30px; }
-    .cart-badge {
-      position: absolute; top: -5px; right: -6px;
-      background: #e53935; color: #fff;
-      border-radius: 10px; font-size: 11px;
-      padding: 1px 5px; font-weight: 700;
-      min-width: 18px; text-align: center;
-    }
+    .cart-badge { position: absolute; top: -5px; right: -6px; background: #e53935; color: #fff; border-radius: 10px; font-size: 11px; padding: 1px 5px; font-weight: 700; }
     .cart-info { flex: 1; cursor: pointer; }
     .cart-hint { color: rgba(255,255,255,0.5); font-size: 11px; }
     .cart-total { color: #f5a01e; font-size: 20px; font-weight: 700; }
-    .checkout-btn {
-      background: #f5a01e; color: #fff;
-      border: none; border-radius: 24px;
-      padding: 11px 26px; font-size: 15px;
-      font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(245,160,30,0.4);
-      white-space: nowrap;
-    }
-    .checkout-btn:active { transform: scale(0.96); }
+    .checkout-btn { background: #f5a01e; color: #fff; border: none; border-radius: 24px; padding: 11px 26px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+    /* ── Overlay ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 200; display: none; opacity: 0; transition: opacity 0.25s; }
+    .overlay.show { opacity: 1; }
 
     /* ── Cart Drawer ── */
-    .overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 200; display: none;
-      opacity: 0; transition: opacity 0.25s;
-    }
-    .overlay.show { opacity: 1; }
-    .cart-drawer {
-      position: absolute; bottom: 0;
-      left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 480px;
-      background: #fff;
-      border-radius: 20px 20px 0 0;
-      padding: 20px 16px 30px;
-      max-height: 65vh; overflow-y: auto;
-      transform: translateX(-50%) translateY(100%);
-      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-    }
+    .cart-drawer { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) translateY(100%); width: 100%; max-width: 480px; background: #fff; border-radius: 20px 20px 0 0; padding: 20px 16px 30px; max-height: 65vh; overflow-y: auto; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
     .overlay.show .cart-drawer { transform: translateX(-50%) translateY(0); }
-    .drawer-handle {
-      width: 36px; height: 4px;
-      background: #e0e0e0; border-radius: 2px;
-      margin: 0 auto 16px;
-    }
+    .drawer-handle { width: 36px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 16px; }
     .drawer-title { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
-    .cart-item {
-      display: flex; align-items: center;
-      gap: 10px; padding: 10px 0;
-      border-bottom: 1px solid #f5f5f5;
-    }
+    .cart-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
     .cart-item-name { flex: 1; font-size: 14px; color: #333; }
     .qty-ctrl { display: flex; align-items: center; gap: 8px; }
-    .qty-btn {
-      width: 26px; height: 26px;
-      border-radius: 50%;
-      border: 1.5px solid #f5a01e;
-      background: none; color: #f5a01e;
-      cursor: pointer; font-size: 16px;
-      display: flex; align-items: center; justify-content: center;
-    }
+    .qty-btn { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid #f5a01e; background: none; color: #f5a01e; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
     .qty-num { font-size: 14px; font-weight: 600; min-width: 22px; text-align: center; }
     .cart-item-subtotal { color: #f5a01e; font-size: 14px; font-weight: 600; min-width: 52px; text-align: right; }
-    .drawer-footer {
-      margin-top: 18px;
-      display: flex; align-items: center; gap: 12px;
-    }
+    .drawer-footer { margin-top: 18px; display: flex; align-items: center; gap: 12px; }
     .drawer-total { flex: 1; font-size: 14px; color: #666; }
     .drawer-total strong { color: #f5a01e; font-size: 20px; font-weight: 700; }
-    .submit-btn {
-      background: #f5a01e; color: #fff;
-      border: none; border-radius: 24px;
-      padding: 12px 30px; font-size: 16px;
-      font-weight: 600; cursor: pointer;
-    }
+    .submit-btn { background: #f5a01e; color: #fff; border: none; border-radius: 24px; padding: 12px 30px; font-size: 16px; font-weight: 600; cursor: pointer; }
+
+    /* ── Payment Modal ── */
+    .pay-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 300; display: none; align-items: center; justify-content: center; }
+    .pay-overlay.show { display: flex; }
+    .pay-modal { background: #fff; border-radius: 20px; width: 340px; max-width: 92vw; overflow: hidden; }
+    .pay-header { background: linear-gradient(135deg, #1e1e40, #2e2e60); padding: 22px 20px 18px; text-align: center; }
+    .pay-shop { color: rgba(255,255,255,0.7); font-size: 13px; margin-bottom: 6px; }
+    .pay-amount { color: #f5a01e; font-size: 38px; font-weight: 800; letter-spacing: -1px; }
+    .pay-amount-label { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px; }
+    .pay-order-info { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 8px; }
+    .pay-body { padding: 20px; }
+    .pay-method-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .pay-tab { flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #eee; background: #fafafa; cursor: pointer; text-align: center; transition: all 0.2s; }
+    .pay-tab.active { border-color: #07c160; background: #f0fbf4; }
+    .pay-tab.active.alipay { border-color: #1677ff; background: #f0f5ff; }
+    .pay-tab-icon { font-size: 22px; display: block; margin-bottom: 4px; }
+    .pay-tab-name { font-size: 12px; font-weight: 600; color: #333; }
+    .qr-section { text-align: center; padding: 10px 0; }
+    .qr-box { display: inline-block; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    #qrcode { width: 160px; height: 160px; }
+    #qrcode img, #qrcode canvas { width: 160px !important; height: 160px !important; }
+    .qr-hint { color: #888; font-size: 12px; margin-top: 10px; }
+    .qr-timer { color: #e53935; font-size: 13px; font-weight: 600; margin-top: 6px; }
+    .pay-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+    .pay-divider::before, .pay-divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
+    .pay-divider span { color: #bbb; font-size: 12px; white-space: nowrap; }
+    .mock-pay-btn { width: 100%; padding: 14px; background: #07c160; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; }
+    .mock-pay-btn.alipay { background: #1677ff; }
+    .mock-pay-btn:active { opacity: 0.85; }
+    .pay-cancel-link { text-align: center; margin-top: 14px; color: #bbb; font-size: 13px; cursor: pointer; }
+    .pay-cancel-link:hover { color: #999; }
+
+    /* ── Pay Status ── */
+    .pay-status-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; background: #fff8e1; border-radius: 8px; margin-bottom: 14px; font-size: 13px; color: #e65100; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Success Screen ── */
+    .success-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 400; display: none; align-items: center; justify-content: center; }
+    .success-overlay.show { display: flex; }
+    .success-card { background: #fff; border-radius: 20px; width: 300px; max-width: 88vw; padding: 32px 24px; text-align: center; }
+    .success-icon { font-size: 60px; margin-bottom: 12px; }
+    .success-title { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+    .success-sub { color: #888; font-size: 14px; margin-bottom: 6px; }
+    .success-amount { color: #f5a01e; font-size: 28px; font-weight: 800; margin-bottom: 20px; }
+    .success-close { width: 100%; padding: 13px; background: #f5a01e; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
 
     /* ── Toast ── */
-    .toast {
-      position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%, -50%) scale(0.9);
-      background: rgba(0,0,0,0.75); color: #fff;
-      padding: 14px 24px; border-radius: 12px;
-      font-size: 15px; z-index: 999;
-      opacity: 0; transition: all 0.2s;
-      pointer-events: none;
-    }
+    .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); background: rgba(0,0,0,0.75); color: #fff; padding: 12px 22px; border-radius: 12px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.2s; pointer-events: none; }
     .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
     .spacer { height: 80px; }
@@ -256,7 +148,7 @@
         <span class="loc-icon">📍</span>
         <span class="status-dot"></span>
         <span class="status-text">营业中</span>
-        <span class="dot-sep">•</span>
+        <span class="status-text">•</span>
         <span class="change-link">更换</span>
       </div>
     </div>
@@ -268,7 +160,6 @@
       <button class="settings-btn">⚙️</button>
     </div>
   </div>
-
   <div class="categories" id="categories">
     <button class="cat-btn active" data-cat="全部">全部</button>
     <button class="cat-btn" data-cat="精酿">精酿</button>
@@ -293,19 +184,77 @@
     <div class="cart-hint">点击查看已选商品</div>
     <div class="cart-total" id="cartTotal">¥0</div>
   </div>
-  <button class="checkout-btn" onclick="submitOrder()">去结算</button>
+  <button class="checkout-btn" onclick="goCheckout()">去结算</button>
 </div>
 
 <!-- Cart Drawer -->
-<div class="overlay" id="overlay" onclick="onOverlayClick(event)">
+<div class="overlay" id="cartOverlay" onclick="onCartOverlayClick(event)">
   <div class="cart-drawer" id="cartDrawer">
     <div class="drawer-handle"></div>
     <div class="drawer-title">🛒 购物车</div>
     <div id="cartItems"></div>
     <div class="drawer-footer">
       <div class="drawer-total">合计：<strong id="drawerTotal">¥0</strong></div>
-      <button class="submit-btn" onclick="submitOrder()">提交订单</button>
+      <button class="submit-btn" onclick="goCheckout()">去结算</button>
     </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="pay-overlay" id="payOverlay">
+  <div class="pay-modal">
+    <div class="pay-header">
+      <div class="pay-shop">海湾精酿吧</div>
+      <div class="pay-amount" id="payAmount">¥0</div>
+      <div class="pay-amount-label">需支付金额</div>
+      <div class="pay-order-info" id="payOrderInfo"></div>
+    </div>
+    <div class="pay-body">
+      <!-- Polling indicator -->
+      <div class="pay-status-bar" id="payStatusBar">
+        <span class="spin">⟳</span> 等待支付中，请完成扫码…
+      </div>
+
+      <!-- Method Tabs -->
+      <div class="pay-method-tabs">
+        <div class="pay-tab active" id="tab-wechat" onclick="switchPayMethod('wechat')">
+          <span class="pay-tab-icon">💚</span>
+          <span class="pay-tab-name">微信支付</span>
+        </div>
+        <div class="pay-tab" id="tab-alipay" onclick="switchPayMethod('alipay')">
+          <span class="pay-tab-icon">🔵</span>
+          <span class="pay-tab-name">支付宝</span>
+        </div>
+      </div>
+
+      <!-- QR Code -->
+      <div class="qr-section">
+        <div class="qr-box">
+          <div id="qrcode"></div>
+        </div>
+        <div class="qr-hint" id="qrHint">请使用微信扫一扫完成支付</div>
+        <div class="qr-timer" id="qrTimer">二维码有效期 15:00</div>
+      </div>
+
+      <div class="pay-divider"><span>演示模式</span></div>
+
+      <!-- Mock Pay Button -->
+      <button class="mock-pay-btn" id="mockPayBtn" onclick="mockPay()">
+        <span id="mockPayIcon">💚</span> 模拟微信支付成功
+      </button>
+      <div class="pay-cancel-link" onclick="cancelPayment()">暂不支付，稍后再说</div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Screen -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <div class="success-title">支付成功！</div>
+    <div class="success-sub" id="successSub">订单已提交</div>
+    <div class="success-amount" id="successAmount"></div>
+    <button class="success-close" onclick="closeSuccess()">好的，继续点单</button>
   </div>
 </div>
 
@@ -315,9 +264,14 @@
 <script>
   const MERCHANT_ID = 1;
   let allProducts = [];
-  let cart = {}; // { productId: { ...product, quantity } }
+  let cart = {};
+  let currentPayment = null;
+  let pollTimer = null;
+  let countdownTimer = null;
+  let payMethod = 'wechat';
+  let qrInstance = null;
 
-  // ── Category filter ──
+  // ── Category filter ──────────────────────────────────
   document.getElementById('categories').addEventListener('click', e => {
     const btn = e.target.closest('.cat-btn');
     if (!btn) return;
@@ -326,7 +280,7 @@
     renderProducts(btn.dataset.cat);
   });
 
-  // ── Load & render products ──
+  // ── Products ─────────────────────────────────────────
   async function loadProducts() {
     const res = await fetch('/api/products');
     allProducts = await res.json();
@@ -336,15 +290,13 @@
   function renderProducts(category) {
     const list = category === '全部' ? allProducts : allProducts.filter(p => p.category === category);
     const container = document.getElementById('products');
-    if (!list.length) {
-      container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">暂无商品</div>';
-      return;
-    }
+    if (!list.length) { container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">暂无商品</div>'; return; }
+    const emojiMap = { '精酿': '🍺', '瓶装': '🍾', '罐装': '🥫' };
     container.innerHTML = list.map(p => `
       <div class="product-card">
         <div class="product-img-wrap">
           <div class="product-img" style="background:${p.gradient}">
-            ${categoryEmoji(p.category)}
+            <span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emojiMap[p.category] || '🍺'}</span>
           </div>
           ${p.badge ? `<span class="badge">${p.badge}</span>` : ''}
         </div>
@@ -361,12 +313,7 @@
     `).join('');
   }
 
-  function categoryEmoji(cat) {
-    const map = { '精酿': '🍺', '瓶装': '🍾', '罐装': '🥫' };
-    return `<span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${map[cat] || '🍺'}</span>`;
-  }
-
-  // ── Cart logic ──
+  // ── Cart ─────────────────────────────────────────────
   function addToCart(id) {
     const p = allProducts.find(p => p.id === id);
     if (!p) return;
@@ -394,31 +341,27 @@
     document.getElementById('cartBar').classList.toggle('hidden', count === 0);
   }
 
-  // ── Cart drawer ──
   function openCart() {
     renderCartItems();
-    const overlay = document.getElementById('overlay');
+    const overlay = document.getElementById('cartOverlay');
     overlay.style.display = 'block';
     requestAnimationFrame(() => overlay.classList.add('show'));
   }
 
   function closeCart() {
-    const overlay = document.getElementById('overlay');
+    const overlay = document.getElementById('cartOverlay');
     overlay.classList.remove('show');
     setTimeout(() => { overlay.style.display = 'none'; }, 280);
   }
 
-  function onOverlayClick(e) {
-    if (e.target === document.getElementById('overlay')) closeCart();
+  function onCartOverlayClick(e) {
+    if (e.target === document.getElementById('cartOverlay')) closeCart();
   }
 
   function renderCartItems() {
     const items = Object.values(cart);
     const container = document.getElementById('cartItems');
-    if (!items.length) {
-      container.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">购物车是空的</div>';
-      return;
-    }
+    if (!items.length) { container.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">购物车是空的</div>'; return; }
     container.innerHTML = items.map(item => `
       <div class="cart-item">
         <span class="cart-item-name">${item.name}</span>
@@ -432,30 +375,169 @@
     `).join('');
   }
 
-  // ── Submit order ──
-  async function submitOrder() {
+  // ── Checkout & Payment ───────────────────────────────
+  async function goCheckout() {
     const items = Object.values(cart);
     if (!items.length) { showToast('请先选择商品'); return; }
+    closeCart();
+
+    // 1. Create order
     const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
     const tableNo = document.getElementById('tableNo').textContent;
-    const payload = {
-      merchantId: MERCHANT_ID,
-      tableNo,
-      items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
-      total
-    };
-    await fetch('/api/orders', {
+    const orderRes = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        merchant_id: MERCHANT_ID,
+        table_no: tableNo,
+        items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+        total
+      })
     });
-    cart = {};
-    updateCartUI();
-    closeCart();
-    showToast('✅ 订单已提交，请稍候！');
+    const order = await orderRes.json();
+
+    // 2. Create payment
+    const payRes = await fetch('/api/payments/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: order.id, method: payMethod })
+    });
+    currentPayment = await payRes.json();
+
+    // 3. Show payment modal
+    showPayModal(order, currentPayment);
   }
 
-  // ── Toast ──
+  function showPayModal(order, payment) {
+    const totalCount = order.items.reduce((s, i) => s + i.quantity, 0);
+    document.getElementById('payAmount').textContent = `¥${payment.amount}`;
+    document.getElementById('payOrderInfo').textContent = `桌号 ${order.table_no} · ${totalCount} 件商品`;
+    document.getElementById('payOverlay').classList.add('show');
+
+    // Build QR code (encode the payment ID so gateway can identify it)
+    buildQR(payment.id);
+
+    // Start countdown
+    startCountdown(payment.expiredAt);
+
+    // Start polling
+    startPolling(payment.id);
+  }
+
+  function buildQR(paymentId) {
+    const el = document.getElementById('qrcode');
+    el.innerHTML = '';
+    qrInstance = new QRCode(el, {
+      text: `${location.origin}/api/payments/${paymentId}/mock-pay`,
+      width: 160, height: 160,
+      colorDark: '#1e1e40', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }
+
+  function switchPayMethod(method) {
+    payMethod = method;
+    const isAlipay = method === 'alipay';
+    document.getElementById('tab-wechat').classList.toggle('active', !isAlipay);
+    document.getElementById('tab-alipay').classList.toggle('active', isAlipay);
+    document.getElementById('tab-alipay').classList.toggle('alipay', isAlipay);
+    document.getElementById('qrHint').textContent = isAlipay ? '请使用支付宝扫一扫完成支付' : '请使用微信扫一扫完成支付';
+    document.getElementById('mockPayBtn').textContent = isAlipay ? '🔵 模拟支付宝支付成功' : '💚 模拟微信支付成功';
+    document.getElementById('mockPayBtn').className = `mock-pay-btn${isAlipay ? ' alipay' : ''}`;
+    // Update payment method on server
+    if (currentPayment) {
+      fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: currentPayment.order_id, method })
+      }).then(r => r.json()).then(p => { currentPayment = p; });
+    }
+  }
+
+  function startCountdown(expiredAt) {
+    clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((new Date(expiredAt) - Date.now()) / 1000));
+      const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const s = String(remaining % 60).padStart(2, '0');
+      document.getElementById('qrTimer').textContent = remaining > 0 ? `二维码有效期 ${m}:${s}` : '⚠️ 二维码已过期，请重新下单';
+      if (remaining === 0) clearInterval(countdownTimer);
+    }, 1000);
+  }
+
+  function startPolling(paymentId) {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/payments/${paymentId}`);
+        const p = await res.json();
+        if (p.status === 'paid') {
+          clearInterval(pollTimer);
+          clearInterval(countdownTimer);
+          closePayModal();
+          showSuccess(p.amount);
+        } else if (p.status === 'expired') {
+          clearInterval(pollTimer);
+          clearInterval(countdownTimer);
+          closePayModal();
+          showToast('⚠️ 支付已超时，请重新下单');
+        }
+      } catch (_) {}
+    }, 2000);
+  }
+
+  async function mockPay() {
+    if (!currentPayment) return;
+    const btn = document.getElementById('mockPayBtn');
+    btn.disabled = true;
+    btn.textContent = '处理中…';
+    try {
+      const res = await fetch(`/api/payments/${currentPayment.id}/mock-pay`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        clearInterval(pollTimer);
+        clearInterval(countdownTimer);
+        closePayModal();
+        // Clear cart after successful payment
+        cart = {};
+        updateCartUI();
+        showSuccess(currentPayment.amount);
+      } else {
+        showToast('支付失败，请重试');
+        btn.disabled = false;
+      }
+    } catch (_) {
+      showToast('网络错误，请重试');
+      btn.disabled = false;
+    }
+  }
+
+  function cancelPayment() {
+    clearInterval(pollTimer);
+    clearInterval(countdownTimer);
+    closePayModal();
+    showToast('已取消支付，订单保留 15 分钟');
+  }
+
+  function closePayModal() {
+    document.getElementById('payOverlay').classList.remove('show');
+    const btn = document.getElementById('mockPayBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<span id="mockPayIcon">💚</span> 模拟微信支付成功';
+  }
+
+  function showSuccess(amount) {
+    document.getElementById('successAmount').textContent = `¥${amount}`;
+    document.getElementById('successSub').textContent = `支付方式：${payMethod === 'wechat' ? '微信支付' : '支付宝'}`;
+    document.getElementById('successOverlay').classList.add('show');
+  }
+
+  function closeSuccess() {
+    document.getElementById('successOverlay').classList.remove('show');
+    currentPayment = null;
+  }
+
+  // ── Toast ─────────────────────────────────────────────
   function showToast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg;
