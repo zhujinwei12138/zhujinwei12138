@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 from sqlalchemy import BigInteger, DateTime, Integer, Numeric, String, Text, func
+
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
@@ -18,7 +19,7 @@ class Product(Base):
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     badge: Mapped[Optional[str]] = mapped_column(String(20))
     gradient: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Merchant(Base):
@@ -30,7 +31,7 @@ class Merchant(Base):
     address: Mapped[Optional[str]] = mapped_column(Text)
     table_count: Mapped[int] = mapped_column(Integer, default=10)
     status: Mapped[str] = mapped_column(String(20), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Order(Base):
@@ -42,12 +43,12 @@ class Order(Base):
     items: Mapped[Any] = mapped_column(JSONB, nullable=False)  # [{id, name, price, quantity}]
     total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="pending_payment")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    preparing_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    preparing_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class Payment(Base):
@@ -59,10 +60,10 @@ class Payment(Base):
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     method: Mapped[str] = mapped_column(String(20), default="wechat")
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    expired_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expired_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     transaction_id: Mapped[Optional[str]] = mapped_column(String(100))
     refund_reason: Mapped[Optional[str]] = mapped_column(Text)
     gateway: Mapped[Optional[str]] = mapped_column(String(20))
