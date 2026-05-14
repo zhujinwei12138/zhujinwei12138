@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>海湾精酿吧</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      background: #f0f0f5;
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #1e1e40;
+      padding: 14px 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-top {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .header-left { flex: 1; }
+    .shop-name { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+    .shop-meta { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+    .loc-icon { color: #f5a01e; font-size: 12px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #00d68f; flex-shrink: 0; }
+    .status-text { color: #aaa; font-size: 12px; }
+    .dot-sep { color: #555; font-size: 12px; }
+    .change-link { color: #f5a01e; font-size: 12px; cursor: pointer; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .table-badge {
+      background: #f5a01e;
+      border-radius: 10px;
+      padding: 5px 12px;
+      text-align: center;
+      min-width: 54px;
+    }
+    .table-label { color: rgba(255,255,255,0.85); font-size: 11px; }
+    .table-num { color: #fff; font-size: 22px; font-weight: 800; line-height: 1.1; }
+    .settings-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 50%;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #aaa; font-size: 16px;
+    }
+
+    /* ── Category Tabs ── */
+    .categories {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 14px;
+      overflow-x: auto;
+      background: #1e1e40;
+    }
+    .categories::-webkit-scrollbar { display: none; }
+    .cat-btn {
+      padding: 7px 18px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: background 0.2s, color 0.2s;
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.7);
+    }
+    .cat-btn.active {
+      background: #f5a01e;
+      color: #fff;
+    }
+
+    /* ── Product Grid ── */
+    .products {
+      padding: 14px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      transition: transform 0.15s;
+    }
+    .product-card:active { transform: scale(0.97); }
+    .product-img-wrap { position: relative; }
+    .product-img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+    }
+    .badge {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: #f5a01e;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+    }
+    .product-info { padding: 10px 10px 12px; }
+    .product-name { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+    .product-desc {
+      font-size: 12px; color: #999;
+      overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.4; margin-bottom: 5px;
+    }
+    .product-meta { font-size: 12px; color: #c0c0c0; margin-bottom: 8px; }
+    .product-footer { display: flex; align-items: center; justify-content: space-between; }
+    .product-price { color: #f5a01e; font-size: 19px; font-weight: 700; }
+    .add-btn {
+      width: 30px; height: 30px;
+      background: #f5a01e;
+      border: none; border-radius: 50%;
+      color: #fff; font-size: 22px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1; transition: transform 0.1s;
+      box-shadow: 0 2px 6px rgba(245,160,30,0.4);
+    }
+    .add-btn:active { transform: scale(0.88); }
+
+    /* ── Cart Bar ── */
+    .cart-bar {
+      position: fixed;
+      bottom: 0;
+      left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: #1e1e40;
+      padding: 10px 16px;
+      display: flex; align-items: center; gap: 12px;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      z-index: 90;
+    }
+    .cart-bar.hidden { transform: translateX(-50%) translateY(110%); }
+    .cart-icon-wrap { position: relative; cursor: pointer; }
+    .cart-icon { font-size: 30px; }
+    .cart-badge {
+      position: absolute; top: -5px; right: -6px;
+      background: #e53935; color: #fff;
+      border-radius: 10px; font-size: 11px;
+      padding: 1px 5px; font-weight: 700;
+      min-width: 18px; text-align: center;
+    }
+    .cart-info { flex: 1; cursor: pointer; }
+    .cart-hint { color: rgba(255,255,255,0.5); font-size: 11px; }
+    .cart-total { color: #f5a01e; font-size: 20px; font-weight: 700; }
+    .checkout-btn {
+      background: #f5a01e; color: #fff;
+      border: none; border-radius: 24px;
+      padding: 11px 26px; font-size: 15px;
+      font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(245,160,30,0.4);
+      white-space: nowrap;
+    }
+    .checkout-btn:active { transform: scale(0.96); }
+
+    /* ── Cart Drawer ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 200; display: none;
+      opacity: 0; transition: opacity 0.25s;
+    }
+    .overlay.show { opacity: 1; }
+    .cart-drawer {
+      position: absolute; bottom: 0;
+      left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 16px 30px;
+      max-height: 65vh; overflow-y: auto;
+      transform: translateX(-50%) translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .overlay.show .cart-drawer { transform: translateX(-50%) translateY(0); }
+    .drawer-handle {
+      width: 36px; height: 4px;
+      background: #e0e0e0; border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+    .drawer-title { font-size: 17px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+    .cart-item {
+      display: flex; align-items: center;
+      gap: 10px; padding: 10px 0;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .cart-item-name { flex: 1; font-size: 14px; color: #333; }
+    .qty-ctrl { display: flex; align-items: center; gap: 8px; }
+    .qty-btn {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 1.5px solid #f5a01e;
+      background: none; color: #f5a01e;
+      cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qty-num { font-size: 14px; font-weight: 600; min-width: 22px; text-align: center; }
+    .cart-item-subtotal { color: #f5a01e; font-size: 14px; font-weight: 600; min-width: 52px; text-align: right; }
+    .drawer-footer {
+      margin-top: 18px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .drawer-total { flex: 1; font-size: 14px; color: #666; }
+    .drawer-total strong { color: #f5a01e; font-size: 20px; font-weight: 700; }
+    .submit-btn {
+      background: #f5a01e; color: #fff;
+      border: none; border-radius: 24px;
+      padding: 12px 30px; font-size: 16px;
+      font-weight: 600; cursor: pointer;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background: rgba(0,0,0,0.75); color: #fff;
+      padding: 14px 24px; border-radius: 12px;
+      font-size: 15px; z-index: 999;
+      opacity: 0; transition: all 0.2s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    .spacer { height: 80px; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-top">
+    <div class="header-left">
+      <div class="shop-name">海湾精酿吧</div>
+      <div class="shop-meta">
+        <span class="loc-icon">📍</span>
+        <span class="status-dot"></span>
+        <span class="status-text">营业中</span>
+        <span class="dot-sep">•</span>
+        <span class="change-link">更换</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="table-badge">
+        <div class="table-label">桌号</div>
+        <div class="table-num" id="tableNo">1</div>
+      </div>
+      <button class="settings-btn">⚙️</button>
+    </div>
+  </div>
+
+  <div class="categories" id="categories">
+    <button class="cat-btn active" data-cat="全部">全部</button>
+    <button class="cat-btn" data-cat="精酿">精酿</button>
+    <button class="cat-btn" data-cat="瓶装">瓶装</button>
+    <button class="cat-btn" data-cat="罐装">罐装</button>
+  </div>
+</div>
+
+<!-- Products -->
+<div class="products" id="products">
+  <div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">加载中...</div>
+</div>
+<div class="spacer"></div>
+
+<!-- Cart Bar -->
+<div class="cart-bar hidden" id="cartBar">
+  <div class="cart-icon-wrap" onclick="openCart()">
+    <span class="cart-icon">🛒</span>
+    <span class="cart-badge" id="cartBadge">0</span>
+  </div>
+  <div class="cart-info" onclick="openCart()">
+    <div class="cart-hint">点击查看已选商品</div>
+    <div class="cart-total" id="cartTotal">¥0</div>
+  </div>
+  <button class="checkout-btn" onclick="submitOrder()">去结算</button>
+</div>
+
+<!-- Cart Drawer -->
+<div class="overlay" id="overlay" onclick="onOverlayClick(event)">
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">🛒 购物车</div>
+    <div id="cartItems"></div>
+    <div class="drawer-footer">
+      <div class="drawer-total">合计：<strong id="drawerTotal">¥0</strong></div>
+      <button class="submit-btn" onclick="submitOrder()">提交订单</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const MERCHANT_ID = 1;
+  let allProducts = [];
+  let cart = {}; // { productId: { ...product, quantity } }
+
+  // ── Category filter ──
+  document.getElementById('categories').addEventListener('click', e => {
+    const btn = e.target.closest('.cat-btn');
+    if (!btn) return;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderProducts(btn.dataset.cat);
+  });
+
+  // ── Load & render products ──
+  async function loadProducts() {
+    const res = await fetch('/api/products');
+    allProducts = await res.json();
+    renderProducts('全部');
+  }
+
+  function renderProducts(category) {
+    const list = category === '全部' ? allProducts : allProducts.filter(p => p.category === category);
+    const container = document.getElementById('products');
+    if (!list.length) {
+      container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">暂无商品</div>';
+      return;
+    }
+    container.innerHTML = list.map(p => `
+      <div class="product-card">
+        <div class="product-img-wrap">
+          <div class="product-img" style="background:${p.gradient}">
+            ${categoryEmoji(p.category)}
+          </div>
+          ${p.badge ? `<span class="badge">${p.badge}</span>` : ''}
+        </div>
+        <div class="product-info">
+          <div class="product-name">${p.name}</div>
+          <div class="product-desc">${p.description}</div>
+          <div class="product-meta">${p.volume} · 酒精度 ${p.alcohol}</div>
+          <div class="product-footer">
+            <span class="product-price">¥${p.price}</span>
+            <button class="add-btn" onclick="addToCart(${p.id})">+</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function categoryEmoji(cat) {
+    const map = { '精酿': '🍺', '瓶装': '🍾', '罐装': '🥫' };
+    return `<span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${map[cat] || '🍺'}</span>`;
+  }
+
+  // ── Cart logic ──
+  function addToCart(id) {
+    const p = allProducts.find(p => p.id === id);
+    if (!p) return;
+    if (!cart[id]) cart[id] = { ...p, quantity: 0 };
+    cart[id].quantity++;
+    updateCartUI();
+    showToast(`已添加 ${p.name}`);
+  }
+
+  function changeQty(id, delta) {
+    if (!cart[id]) return;
+    cart[id].quantity += delta;
+    if (cart[id].quantity <= 0) delete cart[id];
+    updateCartUI();
+    renderCartItems();
+  }
+
+  function updateCartUI() {
+    const items = Object.values(cart);
+    const count = items.reduce((s, i) => s + i.quantity, 0);
+    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    document.getElementById('cartBadge').textContent = count;
+    document.getElementById('cartTotal').textContent = `¥${total}`;
+    document.getElementById('drawerTotal').textContent = `¥${total}`;
+    document.getElementById('cartBar').classList.toggle('hidden', count === 0);
+  }
+
+  // ── Cart drawer ──
+  function openCart() {
+    renderCartItems();
+    const overlay = document.getElementById('overlay');
+    overlay.style.display = 'block';
+    requestAnimationFrame(() => overlay.classList.add('show'));
+  }
+
+  function closeCart() {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('show');
+    setTimeout(() => { overlay.style.display = 'none'; }, 280);
+  }
+
+  function onOverlayClick(e) {
+    if (e.target === document.getElementById('overlay')) closeCart();
+  }
+
+  function renderCartItems() {
+    const items = Object.values(cart);
+    const container = document.getElementById('cartItems');
+    if (!items.length) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">购物车是空的</div>';
+      return;
+    }
+    container.innerHTML = items.map(item => `
+      <div class="cart-item">
+        <span class="cart-item-name">${item.name}</span>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty(${item.id},-1)">−</button>
+          <span class="qty-num">${item.quantity}</span>
+          <button class="qty-btn" onclick="changeQty(${item.id},1)">+</button>
+        </div>
+        <span class="cart-item-subtotal">¥${item.price * item.quantity}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── Submit order ──
+  async function submitOrder() {
+    const items = Object.values(cart);
+    if (!items.length) { showToast('请先选择商品'); return; }
+    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const tableNo = document.getElementById('tableNo').textContent;
+    const payload = {
+      merchantId: MERCHANT_ID,
+      tableNo,
+      items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+      total
+    };
+    await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    cart = {};
+    updateCartUI();
+    closeCart();
+    showToast('✅ 订单已提交，请稍候！');
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  loadProducts();
+</script>
+</body>
+</html>

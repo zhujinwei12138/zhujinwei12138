@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "name": "海湾精酿吧",
+    "phone": "13800138001",
+    "address": "海湾路1号",
+    "tableCount": 10,
+    "status": "active",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "name": "啤酒花园",
+    "phone": "13900139002",
+    "address": "花园街88号",
+    "tableCount": 20,
+    "status": "active",
+    "createdAt": "2024-01-15T00:00:00.000Z"
+  },
+  {
+    "id": 3,
+    "name": "夜啤酒吧",
+    "phone": "13700137003",
+    "address": "夜市路5号",
+    "tableCount": 15,
+    "status": "active",
+    "createdAt": "2024-02-01T00:00:00.000Z"
+  }
+]

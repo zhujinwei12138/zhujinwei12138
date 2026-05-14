@@ -1,0 +1,86 @@
+[
+  {
+    "id": 1704067200001,
+    "merchantId": 1,
+    "tableNo": "3",
+    "items": [
+      { "id": 1, "name": "精酿IPA", "price": 38, "quantity": 2 },
+      { "id": 4, "name": "青岛经典", "price": 12, "quantity": 3 }
+    ],
+    "total": 112,
+    "createdAt": "2024-01-01T10:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704153600002,
+    "merchantId": 2,
+    "tableNo": "5",
+    "items": [
+      { "id": 2, "name": "精酿小麦白啤", "price": 32, "quantity": 3 },
+      { "id": 5, "name": "科罗娜", "price": 18, "quantity": 2 }
+    ],
+    "total": 132,
+    "createdAt": "2024-01-02T14:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704240000003,
+    "merchantId": 1,
+    "tableNo": "1",
+    "items": [
+      { "id": 3, "name": "精酿黑啤", "price": 42, "quantity": 2 },
+      { "id": 6, "name": "百威罐装", "price": 8, "quantity": 4 }
+    ],
+    "total": 116,
+    "createdAt": "2024-01-03T18:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704326400004,
+    "merchantId": 3,
+    "tableNo": "7",
+    "items": [
+      { "id": 5, "name": "科罗娜", "price": 18, "quantity": 5 },
+      { "id": 7, "name": "雪花勇闯天涯", "price": 7, "quantity": 6 }
+    ],
+    "total": 132,
+    "createdAt": "2024-01-04T20:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704412800005,
+    "merchantId": 2,
+    "tableNo": "2",
+    "items": [
+      { "id": 1, "name": "精酿IPA", "price": 38, "quantity": 1 },
+      { "id": 3, "name": "精酿黑啤", "price": 42, "quantity": 2 },
+      { "id": 8, "name": "比利时三料", "price": 45, "quantity": 1 }
+    ],
+    "total": 167,
+    "createdAt": "2024-01-05T19:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704499200006,
+    "merchantId": 3,
+    "tableNo": "4",
+    "items": [
+      { "id": 2, "name": "精酿小麦白啤", "price": 32, "quantity": 4 }
+    ],
+    "total": 128,
+    "createdAt": "2024-01-06T16:00:00.000Z",
+    "status": "paid"
+  },
+  {
+    "id": 1704585600007,
+    "merchantId": 1,
+    "tableNo": "6",
+    "items": [
+      { "id": 4, "name": "青岛经典", "price": 12, "quantity": 6 },
+      { "id": 6, "name": "百威罐装", "price": 8, "quantity": 4 }
+    ],
+    "total": 104,
+    "createdAt": "2024-01-07T21:00:00.000Z",
+    "status": "paid"
+  }
+]

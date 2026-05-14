@@ -1,0 +1,90 @@
+[
+  {
+    "id": 1,
+    "name": "精酿IPA",
+    "description": "热带果香浓郁，苦中带甜，回味悠长",
+    "volume": "500ml",
+    "alcohol": "6.5%",
+    "price": 38,
+    "category": "精酿",
+    "badge": "热销",
+    "gradient": "linear-gradient(160deg,#c87941,#7a3e15)"
+  },
+  {
+    "id": 2,
+    "name": "精酿小麦白啤",
+    "description": "小麦香气清新，口感柔顺，低苦味",
+    "volume": "500ml",
+    "alcohol": "5.0%",
+    "price": 32,
+    "category": "精酿",
+    "badge": "新品",
+    "gradient": "linear-gradient(160deg,#c9a84c,#7a5e15)"
+  },
+  {
+    "id": 3,
+    "name": "精酿黑啤",
+    "description": "浓厚烘焙香，咖啡巧克力余韵",
+    "volume": "500ml",
+    "alcohol": "7.2%",
+    "price": 42,
+    "category": "精酿",
+    "badge": "",
+    "gradient": "linear-gradient(160deg,#3a2010,#0d0603)"
+  },
+  {
+    "id": 4,
+    "name": "青岛经典",
+    "description": "清爽干净，麦芽香足，经典之选",
+    "volume": "500ml",
+    "alcohol": "4.3%",
+    "price": 12,
+    "category": "瓶装",
+    "badge": "推荐",
+    "gradient": "linear-gradient(160deg,#4a8c35,#1e4010)"
+  },
+  {
+    "id": 5,
+    "name": "科罗娜",
+    "description": "清淡爽口，搭配柠檬更佳",
+    "volume": "330ml",
+    "alcohol": "4.5%",
+    "price": 18,
+    "category": "瓶装",
+    "badge": "",
+    "gradient": "linear-gradient(160deg,#d4c040,#8a7a10)"
+  },
+  {
+    "id": 6,
+    "name": "百威罐装",
+    "description": "经典美式拉格，清爽易饮",
+    "volume": "330ml",
+    "alcohol": "3.6%",
+    "price": 8,
+    "category": "罐装",
+    "badge": "热销",
+    "gradient": "linear-gradient(160deg,#c41020,#6a0510)"
+  },
+  {
+    "id": 7,
+    "name": "雪花勇闯天涯",
+    "description": "淡爽清冽，畅快饮用",
+    "volume": "500ml",
+    "alcohol": "3.3%",
+    "price": 7,
+    "category": "罐装",
+    "badge": "",
+    "gradient": "linear-gradient(160deg,#4080c0,#1a3560)"
+  },
+  {
+    "id": 8,
+    "name": "比利时三料",
+    "description": "果味浓郁，酒体丰满，修道院风格",
+    "volume": "330ml",
+    "alcohol": "8.5%",
+    "price": 45,
+    "category": "精酿",
+    "badge": "新品",
+    "gradient": "linear-gradient(160deg,#b06020,#5a2800)"
+  }
+]

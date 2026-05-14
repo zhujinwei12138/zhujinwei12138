@@ -1,0 +1,12 @@
+{
+  "name": "beer-shop",
+  "version": "1.0.0",
+  "description": "啤酒销售小程序 + 后台管理系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
