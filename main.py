@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import engine, Base
 import redis_client as rc
-from routers import merchants, orders, payments, products, stats
+from routers import admin_auth, merchants, orders, payments, products, stats
 from seed import seed_if_empty
 
 logging.basicConfig(
@@ -53,6 +53,7 @@ async def health():
 
 
 # API routes
+app.include_router(admin_auth.router)
 app.include_router(products.router)
 app.include_router(merchants.router)
 app.include_router(orders.router)

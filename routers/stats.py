@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import verify_admin
 from database import get_db
 from models import Merchant, Order, Payment
 from schemas import MerchantStats, SummaryStats
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 PAID_STATUSES = ("paid", "preparing", "completed")
 
 
-@router.get("", response_model=list[MerchantStats])
+@router.get("", response_model=list[MerchantStats], dependencies=[Depends(verify_admin)])
 async def merchant_stats(db: AsyncSession = Depends(get_db)):
     # Aggregate order counts and revenue per merchant in SQL
     rows = (await db.execute(
@@ -55,7 +56,7 @@ async def merchant_stats(db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.get("/summary", response_model=SummaryStats)
+@router.get("/summary", response_model=SummaryStats, dependencies=[Depends(verify_admin)])
 async def summary_stats(db: AsyncSession = Depends(get_db)):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
     today_end = today_start + timedelta(days=1)

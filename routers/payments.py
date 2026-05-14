@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import verify_admin
 from database import get_db
 from models import Order, Payment
 from schemas import PaymentCreateIn, PaymentOut, RefundIn
@@ -24,7 +25,7 @@ def _redis_key(pay_id: str) -> str:
     return f"payment:{pay_id}:status"
 
 
-@router.get("", response_model=list[PaymentOut])
+@router.get("", response_model=list[PaymentOut], dependencies=[Depends(verify_admin)])
 async def list_payments(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Payment).order_by(Payment.created_at.desc()).offset(skip).limit(limit)
@@ -179,7 +180,7 @@ def _gateway_response(gateway: str, success: bool):
     return "success" if success else "fail"
 
 
-@router.post("/{pay_id}/refund", response_model=dict)
+@router.post("/{pay_id}/refund", response_model=dict, dependencies=[Depends(verify_admin)])
 async def refund_payment(pay_id: str, body: RefundIn, db: AsyncSession = Depends(get_db)):
     payment = await db.get(Payment, pay_id)
     if not payment:
