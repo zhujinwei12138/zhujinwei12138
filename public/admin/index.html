@@ -105,9 +105,38 @@
     /* ── Payment method icon ── */
     .pay-method { display: flex; align-items: center; gap: 6px; font-size: 13px; }
     .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* ── Login overlay ── */
+    .login-overlay { position: fixed; inset: 0; background: #1e1e40; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+    .login-box { background: #fff; border-radius: 16px; padding: 36px 32px; width: 360px; max-width: 92vw; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+    .login-box h2 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+    .login-box p { color: #999; font-size: 13px; margin-bottom: 24px; }
+    .login-box input { width: 100%; padding: 12px 14px; border: 1.5px solid #e8e8ee; border-radius: 8px; font-size: 15px; outline: none; margin-bottom: 8px; }
+    .login-box input:focus { border-color: #f5a01e; }
+    .login-error { color: #e53935; font-size: 13px; min-height: 18px; margin-bottom: 12px; }
+    .login-btn { width: 100%; padding: 13px; background: #f5a01e; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .login-btn:hover { background: #e09010; }
+
+    /* ── Error toast ── */
+    .error-toast { position: fixed; top: 20px; right: 24px; background: #c62828; color: #fff; padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 9000; opacity: 0; transform: translateY(-8px); transition: all 0.25s; pointer-events: none; }
+    .error-toast.show { opacity: 1; transform: translateY(0); }
   </style>
 </head>
 <body>
+
+<!-- Login Overlay -->
+<div class="login-overlay" id="loginOverlay" style="display:none">
+  <div class="login-box">
+    <h2>🍺 管理后台</h2>
+    <p>请输入管理员密码以继续</p>
+    <input type="password" id="loginPw" placeholder="管理员密码">
+    <div class="login-error" id="loginError"></div>
+    <button class="login-btn" onclick="doLogin()">登 录</button>
+  </div>
+</div>
+
+<!-- Error Toast -->
+<div class="error-toast" id="errorToast"></div>
 
 <!-- Sidebar -->
 <aside class="sidebar">
@@ -123,7 +152,7 @@
     <div class="nav-item" onclick="switchSection('orders', this)"><span class="icon">📋</span> 订单管理</div>
     <div class="nav-item" onclick="switchSection('payments', this)"><span class="icon">💳</span> 支付管理</div>
   </nav>
-  <div class="sidebar-footer">🔒 管理员 · admin</div>
+  <div class="sidebar-footer">🔒 管理员 · admin <span onclick="doLogout()" style="cursor:pointer;color:#f5a01e;margin-left:8px">[退出]</span></div>
 </aside>
 
 <!-- Main -->
@@ -257,6 +286,53 @@
   let merchantsCache = [];
   let charts = {};
 
+  // ── Auth ─────────────────────────────────────────────
+  // NOTE: this is a frontend-only lock; production should use backend JWT/session auth.
+  const ADMIN_PASS = 'admin2024';
+
+  function checkAuth() {
+    if (sessionStorage.getItem('adminAuth') !== '1') {
+      document.getElementById('loginOverlay').style.display = 'flex';
+    } else {
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadDashboard();
+    }
+  }
+
+  function doLogin() {
+    const pw = document.getElementById('loginPw').value;
+    if (pw === ADMIN_PASS) {
+      sessionStorage.setItem('adminAuth', '1');
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadDashboard();
+    } else {
+      document.getElementById('loginError').textContent = '密码错误，请重试';
+    }
+  }
+
+  function doLogout() {
+    sessionStorage.removeItem('adminAuth');
+    checkAuth();
+  }
+
+  document.getElementById('loginPw').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // ── Helpers ──────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('errorToast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  async function safeFetch(url, options = {}) {
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
   // ── Navigation ──────────────────────────────────────
   const sectionLoaders = {
     dashboard: loadDashboard,
@@ -278,15 +354,19 @@
 
   // ── Dashboard ────────────────────────────────────────
   async function loadDashboard() {
-    const [summary, stats] = await Promise.all([
-      fetch('/api/stats/summary').then(r => r.json()),
-      fetch('/api/stats').then(r => r.json())
-    ]);
-    document.getElementById('s-revenue').textContent = `¥${summary.total_revenue}`;
-    document.getElementById('s-paid').textContent = summary.paid_orders;
-    document.getElementById('s-pending').textContent = summary.pending_orders;
-    document.getElementById('s-refund').textContent = `¥${summary.refund_amount}`;
-    renderCharts(stats, summary);
+    try {
+      const [summary, stats] = await Promise.all([
+        safeFetch('/api/stats/summary'),
+        safeFetch('/api/stats')
+      ]);
+      document.getElementById('s-revenue').textContent = `¥${summary.total_revenue}`;
+      document.getElementById('s-paid').textContent = summary.paid_orders;
+      document.getElementById('s-pending').textContent = summary.pending_orders;
+      document.getElementById('s-refund').textContent = `¥${summary.refund_amount}`;
+      renderCharts(stats, summary);
+    } catch (e) {
+      showError('加载概览数据失败，请刷新重试');
+    }
   }
 
   function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
@@ -324,48 +404,56 @@
 
   // ── Stats ────────────────────────────────────────────
   async function loadStats() {
-    const stats = await fetch('/api/stats').then(r => r.json());
-    const maxRevenue = Math.max(...stats.map(s => s.total_revenue), 1);
-    document.getElementById('statsTable').innerHTML = stats.map(s => `
-      <tr>
-        <td><strong>${s.name}</strong></td>
-        <td>${s.order_count}</td>
-        <td>${s.total_quantity} 杯</td>
-        <td style="color:#f5a01e;font-weight:600">¥${s.total_revenue}</td>
-        <td>${s.order_count ? '¥' + Math.round(s.total_revenue / s.order_count) : '-'}</td>
-        <td><span class="tag ${s.status === 'active' ? 'tag-green' : 'tag-red'}">${s.status === 'active' ? '营业中' : '已关闭'}</span></td>
-      </tr>
-    `).join('');
-    const sorted = [...stats].sort((a, b) => b.total_revenue - a.total_revenue);
-    document.getElementById('rankList').innerHTML = sorted.map((s, i) => `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5">
-        <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#f5a01e':i===1?'#aaa':i===2?'#cd7f32':'#e8e8f0'};color:${i<3?'#fff':'#888'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${i+1}</div>
-        <div style="flex:1">
-          <div style="font-size:14px;font-weight:600;margin-bottom:6px">${s.name}</div>
-          <div class="rank-bar"><div class="rank-progress"><div class="rank-fill" style="width:${Math.round(s.total_revenue/maxRevenue*100)}%"></div></div><span class="rank-num">¥${s.total_revenue}</span></div>
+    try {
+      const stats = await safeFetch('/api/stats');
+      const maxRevenue = Math.max(...stats.map(s => s.total_revenue), 1);
+      document.getElementById('statsTable').innerHTML = stats.map(s => `
+        <tr>
+          <td><strong>${s.name}</strong></td>
+          <td>${s.order_count}</td>
+          <td>${s.total_quantity} 杯</td>
+          <td style="color:#f5a01e;font-weight:600">¥${s.total_revenue}</td>
+          <td>${s.order_count ? '¥' + Math.round(s.total_revenue / s.order_count) : '-'}</td>
+          <td><span class="tag ${s.status === 'active' ? 'tag-green' : 'tag-red'}">${s.status === 'active' ? '营业中' : '已关闭'}</span></td>
+        </tr>
+      `).join('');
+      const sorted = [...stats].sort((a, b) => b.total_revenue - a.total_revenue);
+      document.getElementById('rankList').innerHTML = sorted.map((s, i) => `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5">
+          <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#f5a01e':i===1?'#aaa':i===2?'#cd7f32':'#e8e8f0'};color:${i<3?'#fff':'#888'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${i+1}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;margin-bottom:6px">${s.name}</div>
+            <div class="rank-bar"><div class="rank-progress"><div class="rank-fill" style="width:${Math.round(s.total_revenue/maxRevenue*100)}%"></div></div><span class="rank-num">¥${s.total_revenue}</span></div>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `).join('');
+    } catch (e) {
+      showError('加载统计数据失败');
+    }
   }
 
   // ── Merchants ────────────────────────────────────────
   async function loadMerchants() {
-    merchantsCache = await fetch('/api/merchants').then(r => r.json());
-    const tbody = document.getElementById('merchantsTable');
-    tbody.innerHTML = merchantsCache.length ? merchantsCache.map(m => `
-      <tr>
-        <td><strong>${m.name}</strong></td>
-        <td>${m.phone || '-'}</td>
-        <td>${m.address || '-'}</td>
-        <td>${m.table_count || '-'} 桌</td>
-        <td><span class="tag ${m.status === 'active' ? 'tag-green' : 'tag-red'}">${m.status === 'active' ? '营业中' : '已关闭'}</span></td>
-        <td style="color:#999;font-size:12px">${new Date(m.created_at).toLocaleDateString('zh-CN')}</td>
-        <td class="action-btns">
-          <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})">编辑</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">删除</button>
-        </td>
-      </tr>
-    `).join('') : '<tr><td colspan="7" class="empty">暂无商家</td></tr>';
+    try {
+      merchantsCache = await safeFetch('/api/merchants');
+      const tbody = document.getElementById('merchantsTable');
+      tbody.innerHTML = merchantsCache.length ? merchantsCache.map(m => `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td>${m.phone || '-'}</td>
+          <td>${m.address || '-'}</td>
+          <td>${m.table_count || '-'} 桌</td>
+          <td><span class="tag ${m.status === 'active' ? 'tag-green' : 'tag-red'}">${m.status === 'active' ? '营业中' : '已关闭'}</span></td>
+          <td style="color:#999;font-size:12px">${new Date(m.created_at).toLocaleDateString('zh-CN')}</td>
+          <td class="action-btns">
+            <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})">编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">删除</button>
+          </td>
+        </tr>
+      `).join('') : '<tr><td colspan="7" class="empty">暂无商家</td></tr>';
+    } catch (e) {
+      showError('加载商家列表失败');
+    }
   }
 
   function openMerchantModal() {
@@ -395,16 +483,24 @@
     if (!name) { alert('请输入商家名称'); return; }
     const id = document.getElementById('editId').value;
     const payload = { name, phone: document.getElementById('f-phone').value.trim(), address: document.getElementById('f-address').value.trim(), table_count: parseInt(document.getElementById('f-tableCount').value) || 10, status: document.getElementById('f-status').value };
-    await fetch(id ? `/api/merchants/${id}` : '/api/merchants', { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    closeMerchantModal();
-    loadMerchants();
+    try {
+      await safeFetch(id ? `/api/merchants/${id}` : '/api/merchants', { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      closeMerchantModal();
+      loadMerchants();
+    } catch (e) {
+      showError('保存失败，请重试');
+    }
   }
 
   async function deleteMerchant(id) {
     const m = merchantsCache.find(m => m.id === id);
     if (!confirm(`确定删除商家「${m?.name}」？`)) return;
-    await fetch(`/api/merchants/${id}`, { method: 'DELETE' });
-    loadMerchants();
+    try {
+      await fetch(`/api/merchants/${id}`, { method: 'DELETE' });
+      loadMerchants();
+    } catch (e) {
+      showError('删除失败，请重试');
+    }
   }
 
   // ── Orders ───────────────────────────────────────────
@@ -418,36 +514,44 @@
   };
 
   async function loadOrders() {
-    const [orders, merchants] = await Promise.all([
-      fetch('/api/orders').then(r => r.json()),
-      fetch('/api/merchants').then(r => r.json())
-    ]);
-    const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
-    const sorted = [...orders].sort((a, b) => b.id - a.id);
-    const tbody = document.getElementById('ordersTable');
-    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
-    tbody.innerHTML = sorted.map(o => {
-      const st = ORDER_STATUS_MAP[o.status] || { label: o.status, cls: 'tag-gray' };
-      let actionBtns = '';
-      if (o.status === 'paid') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'preparing')">开始备餐</button>`;
-      if (o.status === 'preparing') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'completed')">标记完成</button>`;
-      return `
-        <tr>
-          <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
-          <td>${mMap[o.merchant_id] || '未知'}</td>
-          <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
-          <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
-          <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
-          <td><span class="tag ${st.cls}">${st.label}</span></td>
-          <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-          <td class="action-btns">${actionBtns}</td>
-        </tr>`;
-    }).join('');
+    try {
+      const [orders, merchants] = await Promise.all([
+        safeFetch('/api/orders'),
+        safeFetch('/api/merchants')
+      ]);
+      const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
+      const sorted = [...orders].sort((a, b) => b.id - a.id);
+      const tbody = document.getElementById('ordersTable');
+      if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
+      tbody.innerHTML = sorted.map(o => {
+        const st = ORDER_STATUS_MAP[o.status] || { label: o.status, cls: 'tag-gray' };
+        let actionBtns = '';
+        if (o.status === 'paid') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'preparing')">开始备餐</button>`;
+        if (o.status === 'preparing') actionBtns = `<button class="btn btn-success btn-sm" onclick="updateOrderStatus(${o.id},'completed')">标记完成</button>`;
+        return `
+          <tr>
+            <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
+            <td>${mMap[o.merchant_id] || '未知'}</td>
+            <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
+            <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
+            <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
+            <td><span class="tag ${st.cls}">${st.label}</span></td>
+            <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+            <td class="action-btns">${actionBtns}</td>
+          </tr>`;
+      }).join('');
+    } catch (e) {
+      showError('加载订单失败');
+    }
   }
 
   async function updateOrderStatus(id, status) {
-    await fetch(`/api/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-    loadOrders();
+    try {
+      await safeFetch(`/api/orders/${id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+      loadOrders();
+    } catch (e) {
+      showError('状态更新失败');
+    }
   }
 
   // ── Payments ─────────────────────────────────────────
@@ -463,34 +567,38 @@
   };
 
   async function loadPayments() {
-    const [payments, merchants, summary] = await Promise.all([
-      fetch('/api/payments').then(r => r.json()),
-      fetch('/api/merchants').then(r => r.json()),
-      fetch('/api/stats/summary').then(r => r.json())
-    ]);
-    const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
-    document.getElementById('p-wechat').textContent = `¥${summary.wechat_revenue}`;
-    document.getElementById('p-alipay').textContent = `¥${summary.alipay_revenue}`;
-    document.getElementById('p-refunds').textContent = payments.filter(p => p.status === 'refunded').length;
+    try {
+      const [payments, merchants, summary] = await Promise.all([
+        safeFetch('/api/payments'),
+        safeFetch('/api/merchants'),
+        safeFetch('/api/stats/summary')
+      ]);
+      const mMap = Object.fromEntries(merchants.map(m => [m.id, m.name]));
+      document.getElementById('p-wechat').textContent = `¥${summary.wechat_revenue}`;
+      document.getElementById('p-alipay').textContent = `¥${summary.alipay_revenue}`;
+      document.getElementById('p-refunds').textContent = payments.filter(p => p.status === 'refunded').length;
 
-    const sorted = [...payments].sort((a, b) => b.id > a.id ? 1 : -1);
-    const tbody = document.getElementById('paymentsTable');
-    if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无支付记录</td></tr>'; return; }
-    tbody.innerHTML = sorted.map(p => {
-      const st = PAY_STATUS_MAP[p.status] || { label: p.status, cls: 'tag-gray' };
-      const refundBtn = p.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${p.id}',${p.amount})">退款</button>` : '';
-      return `
-        <tr>
-          <td style="font-size:11px;color:#999">${p.id}</td>
-          <td>${mMap[p.merchant_id] || '未知'}</td>
-          <td style="color:#f5a01e;font-weight:600">¥${p.amount}</td>
-          <td><span class="pay-method">${PAY_METHOD_MAP[p.method] || p.method}</span></td>
-          <td><span class="tag ${st.cls}">${st.label}</span></td>
-          <td style="font-size:11px;color:#999">${p.transaction_id || '-'}</td>
-          <td style="font-size:11px;color:#999">${p.paid_at ? new Date(p.paid_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : new Date(p.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
-          <td class="action-btns">${refundBtn}</td>
-        </tr>`;
-    }).join('');
+      const sorted = [...payments].sort((a, b) => b.id > a.id ? 1 : -1);
+      const tbody = document.getElementById('paymentsTable');
+      if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无支付记录</td></tr>'; return; }
+      tbody.innerHTML = sorted.map(p => {
+        const st = PAY_STATUS_MAP[p.status] || { label: p.status, cls: 'tag-gray' };
+        const refundBtn = p.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${p.id}',${p.amount})">退款</button>` : '';
+        return `
+          <tr>
+            <td style="font-size:11px;color:#999">${p.id}</td>
+            <td>${mMap[p.merchant_id] || '未知'}</td>
+            <td style="color:#f5a01e;font-weight:600">¥${p.amount}</td>
+            <td><span class="pay-method">${PAY_METHOD_MAP[p.method] || p.method}</span></td>
+            <td><span class="tag ${st.cls}">${st.label}</span></td>
+            <td style="font-size:11px;color:#999">${p.transaction_id || '-'}</td>
+            <td style="font-size:11px;color:#999">${p.paid_at ? new Date(p.paid_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : new Date(p.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+            <td class="action-btns">${refundBtn}</td>
+          </tr>`;
+      }).join('');
+    } catch (e) {
+      showError('加载支付记录失败');
+    }
   }
 
   function openRefundModal(payId, amount) {
@@ -505,13 +613,16 @@
     const payId = document.getElementById('refundPayId').value;
     const reason = document.getElementById('refundReason').value.trim();
     if (!reason) { alert('请填写退款原因'); return; }
-    const res = await fetch(`/api/payments/${payId}/refund`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
-    const data = await res.json();
-    if (data.ok) { closeRefundModal(); loadPayments(); }
-    else alert(data.error || '退款失败');
+    try {
+      const data = await safeFetch(`/api/payments/${payId}/refund`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+      if (data.ok) { closeRefundModal(); loadPayments(); }
+      else showError(data.error || '退款失败');
+    } catch (e) {
+      showError('退款失败，请重试');
+    }
   }
 
-  loadDashboard();
+  checkAuth();
 </script>
 </body>
 </html>

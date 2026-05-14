@@ -16,8 +16,8 @@ ALLOWED_STATUS_TRANSITIONS = {
 
 
 @router.get("", response_model=list[OrderOut])
-async def list_orders(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Order).order_by(Order.id.desc()))
+async def list_orders(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Order).order_by(Order.id.desc()).offset(skip).limit(limit))
     return result.scalars().all()
 
 

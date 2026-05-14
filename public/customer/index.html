@@ -262,7 +262,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const MERCHANT_ID = 1;
+  const MERCHANT_ID = Number(new URLSearchParams(location.search).get('mid') || 1);
   let allProducts = [];
   let cart = {};
   let currentPayment = null;
@@ -270,6 +270,15 @@
   let countdownTimer = null;
   let payMethod = 'wechat';
   let qrInstance = null;
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // ── Category filter ──────────────────────────────────
   document.getElementById('categories').addEventListener('click', e => {
@@ -282,9 +291,15 @@
 
   // ── Products ─────────────────────────────────────────
   async function loadProducts() {
-    const res = await fetch('/api/products');
-    allProducts = await res.json();
-    renderProducts('全部');
+    try {
+      const res = await fetch('/api/products');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      allProducts = await res.json();
+      renderProducts('全部');
+    } catch (e) {
+      document.getElementById('products').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#bbb">加载失败，请刷新重试</div>';
+    }
   }
 
   function renderProducts(category) {
@@ -295,18 +310,18 @@
     container.innerHTML = list.map(p => `
       <div class="product-card">
         <div class="product-img-wrap">
-          <div class="product-img" style="background:${p.gradient}">
+          <div class="product-img" style="background:${escapeHtml(p.gradient)}">
             <span style="font-size:58px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emojiMap[p.category] || '🍺'}</span>
           </div>
-          ${p.badge ? `<span class="badge">${p.badge}</span>` : ''}
+          ${p.badge ? `<span class="badge">${escapeHtml(p.badge)}</span>` : ''}
         </div>
         <div class="product-info">
-          <div class="product-name">${p.name}</div>
-          <div class="product-desc">${p.description}</div>
-          <div class="product-meta">${p.volume} · 酒精度 ${p.alcohol}</div>
+          <div class="product-name">${escapeHtml(p.name)}</div>
+          <div class="product-desc">${escapeHtml(p.description)}</div>
+          <div class="product-meta">${escapeHtml(p.volume)} · 酒精度 ${escapeHtml(p.alcohol)}</div>
           <div class="product-footer">
-            <span class="product-price">¥${p.price}</span>
-            <button class="add-btn" onclick="addToCart(${p.id})">+</button>
+            <span class="product-price">¥${escapeHtml(String(p.price))}</span>
+            <button class="add-btn" onclick="addToCart(${Number(p.id)})">+</button>
           </div>
         </div>
       </div>
@@ -364,11 +379,11 @@
     if (!items.length) { container.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">购物车是空的</div>'; return; }
     container.innerHTML = items.map(item => `
       <div class="cart-item">
-        <span class="cart-item-name">${item.name}</span>
+        <span class="cart-item-name">${escapeHtml(item.name)}</span>
         <div class="qty-ctrl">
-          <button class="qty-btn" onclick="changeQty(${item.id},-1)">−</button>
+          <button class="qty-btn" onclick="changeQty(${Number(item.id)},-1)">−</button>
           <span class="qty-num">${item.quantity}</span>
-          <button class="qty-btn" onclick="changeQty(${item.id},1)">+</button>
+          <button class="qty-btn" onclick="changeQty(${Number(item.id)},1)">+</button>
         </div>
         <span class="cart-item-subtotal">¥${item.price * item.quantity}</span>
       </div>
@@ -381,31 +396,37 @@
     if (!items.length) { showToast('请先选择商品'); return; }
     closeCart();
 
-    // 1. Create order
-    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const tableNo = document.getElementById('tableNo').textContent;
-    const orderRes = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant_id: MERCHANT_ID,
-        table_no: tableNo,
-        items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
-        total
-      })
-    });
-    const order = await orderRes.json();
+    try {
+      // 1. Create order
+      const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const tableNo = document.getElementById('tableNo').textContent;
+      const orderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant_id: MERCHANT_ID,
+          table_no: tableNo,
+          items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+          total
+        })
+      });
+      if (!orderRes.ok) throw new Error(`下单失败 HTTP ${orderRes.status}`);
+      const order = await orderRes.json();
 
-    // 2. Create payment
-    const payRes = await fetch('/api/payments/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: order.id, method: payMethod })
-    });
-    currentPayment = await payRes.json();
+      // 2. Create payment
+      const payRes = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.id, method: payMethod })
+      });
+      if (!payRes.ok) throw new Error(`创建支付失败 HTTP ${payRes.status}`);
+      currentPayment = await payRes.json();
 
-    // 3. Show payment modal
-    showPayModal(order, currentPayment);
+      // 3. Show payment modal
+      showPayModal(order, currentPayment);
+    } catch (e) {
+      showToast('下单失败，请重试');
+    }
   }
 
   function showPayModal(order, payment) {
@@ -418,7 +439,7 @@
     buildQR(payment.id);
 
     // Start countdown
-    startCountdown(payment.expiredAt);
+    startCountdown(payment.expired_at);
 
     // Start polling
     startPolling(payment.id);
@@ -467,9 +488,13 @@
 
   function startPolling(paymentId) {
     clearInterval(pollTimer);
+    let failures = 0;
+    const MAX_FAILURES = 20;
     pollTimer = setInterval(async () => {
       try {
         const res = await fetch(`/api/payments/${paymentId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        failures = 0;
         const p = await res.json();
         if (p.status === 'paid') {
           clearInterval(pollTimer);
@@ -482,7 +507,13 @@
           closePayModal();
           showToast('⚠️ 支付已超时，请重新下单');
         }
-      } catch (_) {}
+      } catch (_) {
+        failures++;
+        if (failures >= MAX_FAILURES) {
+          clearInterval(pollTimer);
+          showToast('网络异常，请联系客服或刷新重试');
+        }
+      }
     }, 2000);
   }
 

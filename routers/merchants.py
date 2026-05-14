@@ -10,8 +10,8 @@ router = APIRouter(prefix="/api/merchants", tags=["merchants"])
 
 
 @router.get("", response_model=list[MerchantOut])
-async def list_merchants(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Merchant).order_by(Merchant.created_at))
+async def list_merchants(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Merchant).order_by(Merchant.created_at).offset(skip).limit(limit))
     return result.scalars().all()
 
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
-from sqlalchemy import BigInteger, DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, func
 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -36,9 +36,16 @@ class Merchant(Base):
 
 class Order(Base):
     __tablename__ = "orders"
+    __table_args__ = (
+        Index("ix_order_merchant_id", "merchant_id"),
+        Index("ix_order_status", "status"),
+        Index("ix_order_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    merchant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.id", ondelete="RESTRICT"), nullable=False
+    )
     table_no: Mapped[str] = mapped_column(String(20), nullable=False)
     items: Mapped[Any] = mapped_column(JSONB, nullable=False)  # [{id, name, price, quantity}]
     total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
@@ -53,9 +60,15 @@ class Order(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
+    __table_args__ = (
+        Index("ix_payment_order_id", "order_id"),
+        Index("ix_payment_status", "status"),
+    )
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
-    order_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    order_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
+    )
     merchant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     method: Mapped[str] = mapped_column(String(20), default="wechat")

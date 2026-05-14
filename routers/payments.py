@@ -1,3 +1,8 @@
+import hashlib
+import hmac
+import json
+import logging
+import os
 import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,9 +15,9 @@ from schemas import PaymentCreateIn, PaymentOut, RefundIn
 import redis_client as rc
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
+logger = logging.getLogger(__name__)
 
 PAYMENT_TTL = 15 * 60  # 15 minutes in seconds
-REDIS_KEY = "payment:{id}:status"
 
 
 def _redis_key(pay_id: str) -> str:
@@ -20,8 +25,10 @@ def _redis_key(pay_id: str) -> str:
 
 
 @router.get("", response_model=list[PaymentOut])
-async def list_payments(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Payment).order_by(Payment.created_at.desc()))
+async def list_payments(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Payment).order_by(Payment.created_at.desc()).offset(skip).limit(limit)
+    )
     return result.scalars().all()
 
 
@@ -59,27 +66,24 @@ async def create_payment(body: PaymentCreateIn, db: AsyncSession = Depends(get_d
     await db.commit()
     await db.refresh(payment)
 
-    # Cache status in Redis with TTL — polling reads from here first
     await rc.redis.setex(_redis_key(pay_id), PAYMENT_TTL, "pending")
+    logger.info("Payment created: %s order=%s amount=%s", pay_id, order.id, payment.amount)
     return payment
 
 
 @router.get("/{pay_id}", response_model=PaymentOut)
 async def get_payment(pay_id: str, db: AsyncSession = Depends(get_db)):
-    # Fast path: read from Redis
     cached_status = await rc.redis.get(_redis_key(pay_id))
 
     payment = await db.get(Payment, pay_id)
     if not payment:
         raise HTTPException(404, "Payment not found")
 
-    # If Redis key expired and DB still shows pending → mark expired
     if cached_status is None and payment.status == "pending":
         payment.status = "expired"
         await db.commit()
         await db.refresh(payment)
     elif cached_status and cached_status != payment.status:
-        # Redis is source of truth for live status
         payment.status = cached_status
 
     return payment
@@ -87,7 +91,7 @@ async def get_payment(pay_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/{pay_id}/mock-pay", response_model=dict)
 async def mock_pay(pay_id: str, db: AsyncSession = Depends(get_db)):
-    """Simulate a successful payment (demo only). Replace with real gateway webhook in production."""
+    """Simulate a successful payment (demo only)."""
     payment = await db.get(Payment, pay_id)
     if not payment:
         raise HTTPException(404, "Payment not found")
@@ -105,21 +109,40 @@ async def mock_pay(pay_id: str, db: AsyncSession = Depends(get_db)):
         order.paid_at = now
 
     await db.commit()
-
-    # Update Redis — keeps polling consistent
     await rc.redis.setex(_redis_key(pay_id), 86400, "paid")
+    logger.info("Payment paid (mock): %s order=%s", pay_id, payment.order_id)
     return {"ok": True}
+
+
+def _verify_gateway_signature(gateway: str, body_bytes: bytes, signature: str | None) -> bool:
+    """Verify HMAC-SHA256 signature from payment gateway webhook.
+    Set PAYMENT_WEBHOOK_SECRET env var to enable enforcement.
+    """
+    secret = os.getenv("PAYMENT_WEBHOOK_SECRET")
+    if not secret:
+        logger.warning("PAYMENT_WEBHOOK_SECRET not set; skipping signature verification for %s", gateway)
+        return True
+    if not signature:
+        return False
+    expected = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
 
 
 @router.post("/callback/{gateway}")
 async def payment_callback(gateway: str, request: Request, db: AsyncSession = Depends(get_db)):
-    """
-    Real payment gateway callback endpoint.
-    WeChat Pay posts XML; Alipay posts form-encoded params.
-    Both are normalised to JSON here for simplicity — adapt signature
-    verification per gateway spec before production use.
-    """
-    body = await request.json()
+    """Real payment gateway callback endpoint."""
+    body_bytes = await request.body()
+    signature = request.headers.get("X-Signature")
+
+    if not _verify_gateway_signature(gateway, body_bytes, signature):
+        logger.warning("Invalid signature for gateway=%s", gateway)
+        raise HTTPException(400, "Invalid signature")
+
+    try:
+        body = json.loads(body_bytes)
+    except Exception:
+        raise HTTPException(400, "Invalid JSON body")
+
     pay_id = body.get("out_trade_no") or body.get("payId")
     txn_id = body.get("transaction_id") or body.get("trade_no")
 
@@ -145,6 +168,7 @@ async def payment_callback(gateway: str, request: Request, db: AsyncSession = De
 
     await db.commit()
     await rc.redis.setex(_redis_key(pay_id), 86400, "paid")
+    logger.info("Payment paid (callback): %s gateway=%s", pay_id, gateway)
     return _gateway_response(gateway, success=True)
 
 
@@ -175,4 +199,5 @@ async def refund_payment(pay_id: str, body: RefundIn, db: AsyncSession = Depends
 
     await db.commit()
     await rc.redis.setex(_redis_key(pay_id), 86400, "refunded")
+    logger.info("Payment refunded: %s reason=%s", pay_id, body.reason)
     return {"ok": True}
