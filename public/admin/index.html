@@ -282,6 +282,7 @@
               <option value="cancelled">已取消</option>
             </select>
             <select id="orderMerchantFilter" onchange="renderOrders()"><option value="">全部商家</option></select>
+            <input type="date" id="orderDateFilter" onchange="renderOrders()" title="按日期筛选" style="padding:6px 10px;border:1px solid #e0e0e0;border-radius:8px;font-size:13px;color:#333;background:#fff;cursor:pointer">
             <button class="btn btn-primary btn-sm" onclick="loadOrders()">🔄 刷新</button>
           </div>
         </div>
@@ -646,7 +647,7 @@
       const maxRevenue = Math.max(...stats.map(s => s.total_revenue), 1);
       document.getElementById('statsTable').innerHTML = stats.map(s => `
         <tr>
-          <td><strong>${s.name}</strong></td>
+          <td><strong>${escapeHtml(s.name)}</strong></td>
           <td>${s.order_count}</td>
           <td>${s.total_quantity} 杯</td>
           <td style="color:#f5a01e;font-weight:600">¥${s.total_revenue}</td>
@@ -659,7 +660,7 @@
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5">
           <div style="width:28px;height:28px;border-radius:50%;background:${i===0?'#f5a01e':i===1?'#aaa':i===2?'#cd7f32':'#e8e8f0'};color:${i<3?'#fff':'#888'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">${i+1}</div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:600;margin-bottom:6px">${s.name}</div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:6px">${escapeHtml(s.name)}</div>
             <div class="rank-bar"><div class="rank-progress"><div class="rank-fill" style="width:${Math.round(s.total_revenue/maxRevenue*100)}%"></div></div><span class="rank-num">¥${s.total_revenue}</span></div>
           </div>
         </div>
@@ -681,16 +682,16 @@
           ? '<span class="tag tag-green">不限</span>'
           : (p.stock === 0 ? '<span class="tag tag-red">售罄</span>' : `<span class="tag tag-orange">${p.stock}</span>`);
         return `<tr>
-          <td><strong>${p.name}</strong></td>
-          <td><span class="tag tag-blue">${p.category}</span></td>
-          <td style="color:#999">${p.volume || '-'}</td>
-          <td style="color:#999">${p.alcohol || '-'}</td>
+          <td><strong>${escapeHtml(p.name)}</strong></td>
+          <td><span class="tag tag-blue">${escapeHtml(p.category)}</span></td>
+          <td style="color:#999">${escapeHtml(p.volume || '-')}</td>
+          <td style="color:#999">${escapeHtml(p.alcohol || '-')}</td>
           <td style="color:#f5a01e;font-weight:600">¥${p.price}</td>
           <td>${stockLabel}</td>
-          <td>${p.badge ? `<span class="tag tag-purple">${p.badge}</span>` : '-'}</td>
+          <td>${p.badge ? `<span class="tag tag-purple">${escapeHtml(p.badge)}</span>` : '-'}</td>
           <td class="action-btns">
             <button class="btn btn-edit btn-sm" onclick="editProduct(${p.id})">编辑</button>
-            <button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32" onclick="openProductImageUpload(${p.id},'${escapeHtml(p.name)}')">🖼 图片</button>
+            <button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32" data-pid="${p.id}" data-pname="${escapeHtml(p.name)}" onclick="openProductImageUpload(this.dataset.pid, this.dataset.pname)">🖼 图片</button>
             <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">删除</button>
           </td>
         </tr>`;
@@ -776,14 +777,14 @@
       const tbody = document.getElementById('merchantsTable');
       tbody.innerHTML = merchantsCache.length ? merchantsCache.map(m => `
         <tr>
-          <td><strong>${m.name}</strong></td>
-          <td>${m.phone || '-'}</td>
-          <td>${m.address || '-'}</td>
+          <td><strong>${escapeHtml(m.name)}</strong></td>
+          <td>${escapeHtml(m.phone || '-')}</td>
+          <td>${escapeHtml(m.address || '-')}</td>
           <td>${m.table_count || '-'} 桌</td>
           <td><span class="tag ${m.status === 'active' ? 'tag-green' : 'tag-red'}">${m.status === 'active' ? '营业中' : '已关闭'}</span></td>
           <td style="color:#999;font-size:12px">${new Date(m.created_at).toLocaleDateString('zh-CN')}</td>
           <td class="action-btns">
-            <button class="btn btn-qr btn-sm" onclick="showMerchantQR(${m.id},'${m.name.replace(/'/g,"\\'")}')">二维码</button>
+            <button class="btn btn-qr btn-sm" data-mid="${m.id}" data-mname="${escapeHtml(m.name)}" onclick="showMerchantQR(this.dataset.mid, this.dataset.mname)">二维码</button>
             <button class="btn btn-edit btn-sm" onclick="editMerchant(${m.id})">编辑</button>
             <button class="btn btn-danger btn-sm" onclick="deleteMerchant(${m.id})">删除</button>
           </td>
@@ -872,18 +873,44 @@
     cancelled:       { label: '已取消', cls: 'tag-gray' }
   };
 
+  let _knownOrderIds = new Set();
+
+  function _notifyNewOrders(orders) {
+    const newPaid = orders.filter(o => o.status === 'paid' && !_knownOrderIds.has(o.id));
+    if (newPaid.length && _knownOrderIds.size > 0) {
+      try {
+        // 播放提示音（利用 AudioContext 生成短促蜂鸣声）
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880; gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(); osc.stop(ctx.currentTime + 0.4);
+      } catch (_) {}
+      // 浏览器通知
+      if (Notification.permission === 'granted') {
+        new Notification(`🍺 新订单 ×${newPaid.length}`, { body: `桌号：${newPaid.map(o => o.table_no).join('、')}，请及时处理`, icon: '/admin/favicon.ico' });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
+    orders.forEach(o => _knownOrderIds.add(o.id));
+  }
+
   async function loadOrders() {
     try {
       const [orders, merchants] = await Promise.all([
         safeFetch('/api/orders'),
         safeFetch('/api/merchants')
       ]);
+      _notifyNewOrders(orders);
       allOrders = orders;
       mMapCache = Object.fromEntries(merchants.map(m => [m.id, m.name]));
       // Populate merchant filter
       const sel = document.getElementById('orderMerchantFilter');
       const cur = sel.value;
-      sel.innerHTML = '<option value="">全部商家</option>' + merchants.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      sel.innerHTML = '<option value="">全部商家</option>' + merchants.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
       sel.value = cur;
       renderOrders();
     } catch (e) {
@@ -894,9 +921,11 @@
   function renderOrders() {
     const statusFilter = document.getElementById('orderStatusFilter').value;
     const merchantFilter = document.getElementById('orderMerchantFilter').value;
+    const dateFilter = document.getElementById('orderDateFilter')?.value || '';
     let list = [...allOrders].sort((a, b) => b.id - a.id);
     if (statusFilter) list = list.filter(o => o.status === statusFilter);
     if (merchantFilter) list = list.filter(o => String(o.merchant_id) === merchantFilter);
+    if (dateFilter) list = list.filter(o => o.created_at && o.created_at.startsWith(dateFilter));
     const tbody = document.getElementById('ordersTable');
     if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">暂无订单</td></tr>'; return; }
     tbody.innerHTML = list.map(o => {
@@ -907,9 +936,9 @@
       return `
         <tr>
           <td style="color:#999;font-size:12px">#${String(o.id).slice(-6)}</td>
-          <td>${mMapCache[o.merchant_id] || '未知'}</td>
-          <td><span class="tag tag-blue">桌 ${o.table_no}</span></td>
-          <td class="order-items-cell">${o.items.map(i => `${i.name}×${i.quantity}`).join('、')}</td>
+          <td>${escapeHtml(mMapCache[o.merchant_id] || '未知')}</td>
+          <td><span class="tag tag-blue">桌 ${escapeHtml(o.table_no)}</span></td>
+          <td class="order-items-cell">${o.items.map(i => `${escapeHtml(i.name)}×${i.quantity}`).join('、')}</td>
           <td style="color:#f5a01e;font-weight:600">¥${o.total}</td>
           <td><span class="tag ${st.cls}">${st.label}</span></td>
           <td style="color:#999;font-size:12px">${new Date(o.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>

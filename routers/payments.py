@@ -136,6 +136,8 @@ async def mock_pay(pay_id: str, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     await rc.redis.setex(_redis_key(pay_id), 86400, "paid")
+    if order:
+        await rc.redis.publish(f"order:{order.id}:status", json.dumps({"id": order.id, "status": "paid"}))
     logger.info("Payment paid (mock): %s order=%s", pay_id, payment.order_id)
     return {"ok": True}
 
@@ -321,6 +323,8 @@ async def payment_callback(gateway: str, request: Request, db: AsyncSession = De
 
     await db.commit()
     await rc.redis.setex(_redis_key(pay_id), 86400, "paid")
+    if order:
+        await rc.redis.publish(f"order:{order.id}:status", json.dumps({"id": order.id, "status": "paid"}))
 
     if txn_id:
         await rc.redis.setex(_txn_dedup_key(txn_id), 86400, "1")

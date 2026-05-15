@@ -7,7 +7,11 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://beer:beer@localhost:5432/beerdb"
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+_pool_kwargs: dict = {}
+if "sqlite" not in DATABASE_URL:
+    _pool_kwargs = {"pool_size": 20, "max_overflow": 10, "pool_recycle": 3600}
+
+engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True, **_pool_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

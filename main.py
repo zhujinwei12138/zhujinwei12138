@@ -43,9 +43,25 @@ def _run_migrations() -> None:
     logger.info("Alembic migrations applied")
 
 
+_BANNED_KEYS = {"change-this-before-production", ""}
+
+
+def _validate_env() -> None:
+    """在生产模式（PAYMENT_MODE=live）下强制校验关键 env var，防止使用默认弱密钥上线。"""
+    if os.getenv("PAYMENT_MODE", "mock") != "live":
+        return
+    if os.getenv("ADMIN_SECRET_KEY", "") in _BANNED_KEYS:
+        raise RuntimeError("ADMIN_SECRET_KEY must be changed before running in production (PAYMENT_MODE=live)")
+    if not os.getenv("PAYMENT_WEBHOOK_SECRET", "").strip():
+        raise RuntimeError("PAYMENT_WEBHOOK_SECRET must be set before running in production")
+    if os.getenv("DEMO_MODE", "false").lower() == "true":
+        logger.warning("DEMO_MODE=true in live payment mode — OTP codes will be exposed in responses!")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
+    _validate_env()
     rc.init_redis()
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _run_migrations)

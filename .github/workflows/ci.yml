@@ -55,8 +55,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-dev.txt
-      - run: pytest tests/ -v --tb=short
+      - run: pip install -r requirements-dev.txt pytest-cov
+      - name: Security scan
+        run: pip install bandit pip-audit && bandit -r . -ll -q --exclude ./tests && pip-audit
+        continue-on-error: true
+      - name: Run tests with coverage
+        run: pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-omit="tests/*,alembic/*"
         env:
           DATABASE_URL: postgresql+asyncpg://beer:testpass@localhost:5432/beerdb_test
           REDIS_URL: redis://localhost:6379/0

@@ -106,6 +106,7 @@
     #qrcode img, #qrcode canvas { width: 160px !important; height: 160px !important; }
     .qr-hint { color: #888; font-size: 12px; margin-top: 10px; }
     .qr-timer { color: #e53935; font-size: 13px; font-weight: 600; margin-top: 6px; }
+    .retry-pay-btn { width: 100%; padding: 12px; background: #f5a01e; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; display: none; }
     .pay-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
     .pay-divider::before, .pay-divider::after { content: ''; flex: 1; height: 1px; background: #eee; }
     .pay-divider span { color: #bbb; font-size: 12px; white-space: nowrap; }
@@ -286,6 +287,7 @@
       <button class="mock-pay-btn" id="mockPayBtn" onclick="mockPay()">
         <span id="mockPayIcon">💚</span> 模拟微信支付成功
       </button>
+      <button class="retry-pay-btn" id="retryPayBtn" onclick="retryPayment()">↺ 重新支付</button>
       <div class="pay-cancel-link" onclick="cancelPayment()">暂不支付，稍后再说</div>
     </div>
   </div>
@@ -353,6 +355,7 @@
   const MERCHANT_ID = Number(new URLSearchParams(location.search).get('mid') || 1);
   let allProducts = [];
   let cart = {};
+  try { cart = JSON.parse(sessionStorage.getItem('cart_' + MERCHANT_ID) || '{}'); } catch (_) { cart = {}; }
   let currentPayment = null;
   let currentOrderId = null;
   let pollTimer = null;
@@ -503,6 +506,7 @@
     document.getElementById('cartTotal').textContent = `¥${total}`;
     document.getElementById('drawerTotal').textContent = `¥${total}`;
     document.getElementById('cartBar').classList.toggle('hidden', count === 0);
+    try { sessionStorage.setItem('cart_' + MERCHANT_ID, JSON.stringify(cart)); } catch (_) {}
   }
 
   function openCart() {
@@ -540,6 +544,11 @@
   }
 
   // ── Checkout & Payment ───────────────────────────────────
+  function _getCustomerId() {
+    if (!customerToken) return null;
+    try { return JSON.parse(atob(customerToken.split('.')[1])).sub; } catch (_) { return null; }
+  }
+
   async function goCheckout() {
     const items = Object.values(cart);
     if (!items.length) { showToast('请先选择商品'); return; }
@@ -547,20 +556,52 @@
     if (!tableNo) { showTableModal(true); return; }
     closeCart();
 
+    // 结账前刷新库存，防止商品已售罄
     try {
-      const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const freshRes = await fetch('/api/products');
+      if (freshRes.ok) {
+        const freshProducts = await freshRes.json();
+        allProducts = freshProducts;
+        const stockIssues = items.filter(item => {
+          const fp = freshProducts.find(p => p.id === item.id);
+          return fp && fp.stock !== null && fp.stock !== undefined && fp.stock < item.quantity;
+        });
+        if (stockIssues.length) {
+          stockIssues.forEach(item => {
+            const fp = freshProducts.find(p => p.id === item.id);
+            if (fp && fp.stock === 0) {
+              showToast(`「${item.name}」已售罄，已从购物车移除`);
+              delete cart[item.id];
+            } else if (fp) {
+              showToast(`「${item.name}」库存不足，最多可购 ${fp.stock} 件`);
+              cart[item.id].quantity = fp.stock;
+            }
+          });
+          updateCartUI();
+          renderProducts(document.querySelector('.cat-btn.active')?.dataset.cat || '全部');
+          return;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      const total = Object.values(cart).reduce((s, i) => s + i.price * i.quantity, 0);
+      const cartItems = Object.values(cart);
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchant_id: MERCHANT_ID,
           table_no: tableNo,
-          items: items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+          items: cartItems.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
           total,
-          customer_id: customerToken ? JSON.parse(atob(customerToken.split('.')[1])).sub : null,
+          customer_id: _getCustomerId(),
         })
       });
-      if (!orderRes.ok) throw new Error(`下单失败 HTTP ${orderRes.status}`);
+      if (!orderRes.ok) {
+        const err = await orderRes.json().catch(() => ({}));
+        throw new Error(err.detail || `下单失败 HTTP ${orderRes.status}`);
+      }
       const order = await orderRes.json();
       currentOrderId = order.id;
 
@@ -574,7 +615,7 @@
 
       showPayModal(order, currentPayment);
     } catch (e) {
-      showToast('下单失败，请重试');
+      showToast(e.message || '下单失败，请重试');
     }
   }
 
@@ -627,9 +668,41 @@
       const remaining = Math.max(0, Math.floor((new Date(expiredAt) - Date.now()) / 1000));
       const m = String(Math.floor(remaining / 60)).padStart(2, '0');
       const s = String(remaining % 60).padStart(2, '0');
-      document.getElementById('qrTimer').textContent = remaining > 0 ? `二维码有效期 ${m}:${s}` : '⚠️ 二维码已过期，请重新下单';
-      if (remaining === 0) clearInterval(countdownTimer);
+      document.getElementById('qrTimer').textContent = remaining > 0 ? `二维码有效期 ${m}:${s}` : '⚠️ 二维码已过期';
+      if (remaining === 0) {
+        clearInterval(countdownTimer);
+        clearInterval(pollTimer);
+        document.getElementById('mockPayBtn').style.display = 'none';
+        document.getElementById('retryPayBtn').style.display = 'block';
+      }
     }, 1000);
+  }
+
+  async function retryPayment() {
+    if (!currentOrderId) return;
+    const btn = document.getElementById('retryPayBtn');
+    btn.disabled = true;
+    btn.textContent = '创建中…';
+    try {
+      const payRes = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: currentOrderId, method: payMethod })
+      });
+      if (!payRes.ok) throw new Error(`HTTP ${payRes.status}`);
+      currentPayment = await payRes.json();
+      buildQR(currentPayment.id);
+      startCountdown(currentPayment.expired_at);
+      startPolling(currentPayment.id);
+      document.getElementById('mockPayBtn').style.display = '';
+      document.getElementById('retryPayBtn').style.display = 'none';
+      btn.disabled = false;
+      btn.textContent = '↺ 重新支付';
+    } catch (_) {
+      showToast('重新发起支付失败，请关闭后重新下单');
+      btn.disabled = false;
+      btn.textContent = '↺ 重新支付';
+    }
   }
 
   function startPolling(paymentId) {
@@ -859,6 +932,13 @@
         const res = await fetch('/api/customers/me/orders?limit=20', {
           headers: { 'Authorization': `Bearer ${customerToken}` }
         });
+        if (res.status === 401 || res.status === 403) {
+          customerToken = null; customerPhone = null;
+          localStorage.removeItem('customerToken'); localStorage.removeItem('customerPhone');
+          updateAccountUI();
+          list.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb">登录已过期，请重新<a href="#" onclick="onAccountClick()" style="color:#f5a01e">登录</a></div>';
+          return;
+        }
         if (!res.ok) throw new Error();
         orders = await res.json();
       } else {
