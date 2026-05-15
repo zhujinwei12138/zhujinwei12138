@@ -1,27 +1,31 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import check_credentials, check_password, create_admin_token, verify_super_admin
+from audit import record as audit_record
+from auth import check_credentials, check_password, create_admin_token, hash_password, verify_admin, verify_super_admin
 from database import get_db
-from models import AdminUser
+from models import AdminUser, AuditLog
 from schemas import AdminUserIn, AdminUserOut
 import redis_client as rc
-from auth import hash_password
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
 
 _FAIL_PREFIX = "login_fail:"
 _MAX_FAILURES = 10
-_LOCKOUT_TTL = 5 * 60  # 5 minutes
+_LOCKOUT_TTL = 5 * 60
 
 
 class LoginIn(BaseModel):
     username: str
     password: str
+
+
+class PasswordChangeIn(BaseModel):
+    new_password: str = Field(..., min_length=6, max_length=100)
 
 
 @router.post("/login")
@@ -34,8 +38,10 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
         raise HTTPException(429, "登录尝试过多，请 5 分钟后再试")
 
     token = None
+    role = "super_admin"
+    merchant_id = None
 
-    # 1. Check database admin users first
+    # 1. Check DB admin users first
     result = await db.execute(
         select(AdminUser).where(AdminUser.username == body.username, AdminUser.is_active == True)
     )
@@ -46,8 +52,9 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
             role=db_user.role,
             merchant_id=db_user.merchant_id,
         )
+        role = db_user.role
 
-    # 2. Fall back to env-based super admin
+    # 2. Fallback to env-based super admin
     if token is None and check_credentials(body.username, body.password):
         token = create_admin_token(username=body.username, role="super_admin")
 
@@ -60,19 +67,25 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
         raise HTTPException(401, "用户名或密码错误")
 
     await rc.redis.delete(rate_key)
-    logger.info("Login success ip=%s user=%s", client_ip, body.username)
+    logger.info("Login success ip=%s user=%s role=%s", client_ip, body.username, role)
     return {"token": token, "type": "bearer"}
 
 
-# ── Admin user management (super_admin only) ─────────────────
+# ── Admin user management ─────────────────────────────────────────────────────
+
 @router.get("/users", response_model=list[AdminUserOut], dependencies=[Depends(verify_super_admin)])
 async def list_admin_users(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AdminUser).order_by(AdminUser.id))
     return result.scalars().all()
 
 
-@router.post("/users", response_model=AdminUserOut, dependencies=[Depends(verify_super_admin)])
-async def create_admin_user(body: AdminUserIn, db: AsyncSession = Depends(get_db)):
+@router.post("/users", response_model=AdminUserOut)
+async def create_admin_user(
+    body: AdminUserIn,
+    request: Request,
+    admin: dict = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
     existing = await db.execute(select(AdminUser).where(AdminUser.username == body.username))
     if existing.scalar_one_or_none():
         raise HTTPException(409, "用户名已存在")
@@ -83,14 +96,24 @@ async def create_admin_user(body: AdminUserIn, db: AsyncSession = Depends(get_db
         merchant_id=body.merchant_id,
     )
     db.add(user)
+    await db.flush()
+    await audit_record(db, actor=admin["sub"], action="CREATE", resource="admin_users",
+                       resource_id=str(user.id), detail={"username": user.username, "role": user.role},
+                       ip=request.client.host if request.client else None)
     await db.commit()
     await db.refresh(user)
-    logger.info("AdminUser created: username=%s role=%s", user.username, user.role)
+    logger.info("AdminUser created: username=%s role=%s by=%s", user.username, user.role, admin["sub"])
     return user
 
 
-@router.put("/users/{user_id}", response_model=AdminUserOut, dependencies=[Depends(verify_super_admin)])
-async def update_admin_user(user_id: int, body: AdminUserIn, db: AsyncSession = Depends(get_db)):
+@router.put("/users/{user_id}", response_model=AdminUserOut)
+async def update_admin_user(
+    user_id: int,
+    body: AdminUserIn,
+    request: Request,
+    admin: dict = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
     user = await db.get(AdminUser, user_id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -98,17 +121,70 @@ async def update_admin_user(user_id: int, body: AdminUserIn, db: AsyncSession = 
     user.password_hash = hash_password(body.password)
     user.role = body.role
     user.merchant_id = body.merchant_id
+    await audit_record(db, actor=admin["sub"], action="UPDATE", resource="admin_users",
+                       resource_id=str(user_id), ip=request.client.host if request.client else None)
     await db.commit()
     await db.refresh(user)
     return user
 
 
-@router.delete("/users/{user_id}", dependencies=[Depends(verify_super_admin)])
-async def delete_admin_user(user_id: int, db: AsyncSession = Depends(get_db)):
+@router.put("/users/{user_id}/password")
+async def change_admin_password(
+    user_id: int,
+    body: PasswordChangeIn,
+    request: Request,
+    admin: dict = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change a specific admin user's password without affecting other fields."""
     user = await db.get(AdminUser, user_id)
     if not user:
         raise HTTPException(404, "User not found")
+    user.password_hash = hash_password(body.new_password)
+    await audit_record(db, actor=admin["sub"], action="CHANGE_PASSWORD", resource="admin_users",
+                       resource_id=str(user_id), ip=request.client.host if request.client else None)
+    await db.commit()
+    logger.info("AdminUser password changed: id=%s by=%s", user_id, admin["sub"])
+    return {"ok": True}
+
+
+@router.delete("/users/{user_id}")
+async def delete_admin_user(
+    user_id: int,
+    request: Request,
+    admin: dict = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    await audit_record(db, actor=admin["sub"], action="DELETE", resource="admin_users",
+                       resource_id=str(user_id), detail={"username": user.username},
+                       ip=request.client.host if request.client else None)
     await db.delete(user)
     await db.commit()
-    logger.info("AdminUser deleted: id=%s", user_id)
+    logger.info("AdminUser deleted: id=%s by=%s", user_id, admin["sub"])
     return {"ok": True}
+
+
+# ── Audit log viewer ──────────────────────────────────────────────────────────
+
+@router.get("/audit-logs", dependencies=[Depends(verify_admin)])
+async def list_audit_logs(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+    )
+    rows = result.scalars().all()
+    return [
+        {
+            "id": r.id, "actor": r.actor, "action": r.action,
+            "resource": r.resource, "resource_id": r.resource_id,
+            "detail": r.detail, "ip": r.ip,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]

@@ -110,3 +110,17 @@ class AdminUser(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_log_created_at", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    actor: Mapped[str] = mapped_column(String(50), nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource: Mapped[str] = mapped_column(String(50), nullable=False)
+    resource_id: Mapped[Optional[str]] = mapped_column(String(50))
+    detail: Mapped[Optional[Any]] = mapped_column(JSONB)
+    ip: Mapped[Optional[str]] = mapped_column(String(45))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

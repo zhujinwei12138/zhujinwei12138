@@ -856,7 +856,9 @@
       let orders;
       // Logged-in customers see all their orders across devices
       if (customerToken) {
-        const res = await fetch(`/api/customers/me/orders?token=${encodeURIComponent(customerToken)}&limit=20`);
+        const res = await fetch('/api/customers/me/orders?limit=20', {
+          headers: { 'Authorization': `Bearer ${customerToken}` }
+        });
         if (!res.ok) throw new Error();
         orders = await res.json();
       } else {

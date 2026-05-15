@@ -7,11 +7,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from audit import record as audit_record
 from auth import verify_admin
 from database import get_db
 from models import Order, Product
 from schemas import OrderIn, OrderOut, OrderStatusIn
 import redis_client as rc
+
+_BTABLE_RATE_PREFIX = "rate:by_table:"  # per IP, 30 req/min
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 logger = logging.getLogger(__name__)
@@ -37,11 +40,22 @@ async def list_orders(skip: int = 0, limit: int = 200, db: AsyncSession = Depend
 
 @router.get("/by-table", response_model=list[OrderOut])
 async def orders_by_table(
+    request: Request,
     merchant_id: int = Query(..., gt=0),
     table_no: str = Query(..., min_length=1, max_length=20),
     limit: int = Query(5, ge=1, le=20),
     db: AsyncSession = Depends(get_db),
 ):
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = _BTABLE_RATE_PREFIX + client_ip
+    count = await rc.redis.get(rate_key)
+    if count and int(count) >= 30:
+        raise HTTPException(429, "请求过于频繁，请稍后重试")
+    async with rc.redis.pipeline(transaction=False) as pipe:
+        await pipe.incr(rate_key)
+        await pipe.expire(rate_key, 60)
+        await pipe.execute()
+
     result = await db.execute(
         select(Order)
         .where(Order.merchant_id == merchant_id, Order.table_no == table_no)
@@ -137,8 +151,14 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
     return order
 
 
-@router.put("/{order_id}/status", response_model=OrderOut, dependencies=[Depends(verify_admin)])
-async def update_order_status(order_id: int, body: OrderStatusIn, db: AsyncSession = Depends(get_db)):
+@router.put("/{order_id}/status", response_model=OrderOut)
+async def update_order_status(
+    order_id: int,
+    body: OrderStatusIn,
+    request: Request,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
@@ -148,8 +168,12 @@ async def update_order_status(order_id: int, body: OrderStatusIn, db: AsyncSessi
     now = datetime.now(timezone.utc)
     order.status = body.status
     setattr(order, f"{body.status}_at", now)
+    await audit_record(
+        db, actor=admin["sub"], action="STATUS_CHANGE", resource="orders",
+        resource_id=str(order_id), detail={"status": body.status},
+        ip=request.client.host if request.client else None,
+    )
     await db.commit()
     await db.refresh(order)
-    # Notify SSE subscribers
     await _publish_order_status(order_id, body.status)
     return order

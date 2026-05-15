@@ -28,12 +28,24 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt mypy
-      - run: mypy main.py routers/ auth.py models.py schemas.py
+      - run: mypy main.py routers/ auth.py models.py schemas.py audit.py
 
   test:
     name: Tests
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: beer
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: beerdb_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U beer -d beerdb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
@@ -43,11 +55,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements-dev.txt aiosqlite
+      - run: pip install -r requirements-dev.txt
       - run: pytest tests/ -v --tb=short
         env:
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: postgresql+asyncpg://beer:testpass@localhost:5432/beerdb_test
           REDIS_URL: redis://localhost:6379/0
-          ADMIN_SECRET_KEY: ci-test-secret
+          ADMIN_SECRET_KEY: ci-test-secret-key-32chars-minimum
           ADMIN_USER: admin
           ADMIN_PASS: testpass
+          PAYMENT_MODE: mock
+          DEMO_MODE: "true"

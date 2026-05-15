@@ -1,11 +1,13 @@
 import logging
+import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,12 +19,18 @@ import redis_client as rc
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 logger = logging.getLogger(__name__)
 
-_OTP_TTL = 300  # 5 minutes
+_OTP_TTL = 300          # 5 minutes
 _TOKEN_TTL_HOURS = 72
+_DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
-import os
 _SECRET = os.getenv("ADMIN_SECRET_KEY", "change-this-before-production")
 _ALGORITHM = "HS256"
+
+# Rate limiting keys
+_OTP_SEND_PREFIX = "otp_send:"    # per phone: 1/min
+_OTP_IP_PREFIX = "otp_ip:"        # per IP: 10/5min
+
+_customer_bearer = HTTPBearer()
 
 
 def _otp_key(phone: str) -> str:
@@ -50,19 +58,48 @@ def verify_customer_token(token: str) -> dict:
         raise HTTPException(401, "Invalid token")
 
 
+async def _check_otp_rate(phone: str, client_ip: str) -> None:
+    """Raise 429 if phone or IP exceeds send-OTP rate limits."""
+    phone_key = _OTP_SEND_PREFIX + phone
+    ip_key = _OTP_IP_PREFIX + client_ip
+
+    phone_count = await rc.redis.get(phone_key)
+    if phone_count and int(phone_count) >= 1:
+        raise HTTPException(429, "请等待 1 分钟后再次获取验证码")
+
+    ip_count = await rc.redis.get(ip_key)
+    if ip_count and int(ip_count) >= 10:
+        raise HTTPException(429, "请求过于频繁，请稍后再试")
+
+
 @router.post("/send-otp")
-async def send_otp(body: CustomerSendOTP):
-    """Generate a 6-digit OTP and store in Redis (demo: returns code in response)."""
-    code = str(secrets.randbelow(900000) + 100000)  # 100000–999999
+async def send_otp(body: CustomerSendOTP, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    await _check_otp_rate(body.phone, client_ip)
+
+    code = str(secrets.randbelow(900000) + 100000)
     await rc.redis.setex(_otp_key(body.phone), _OTP_TTL, code)
-    logger.info("OTP sent: phone=%s", body.phone[-4:])
-    # In production: call SMS gateway here. For demo, return in response.
-    return {"ok": True, "demo_code": code}
+
+    # Rate-limit counters
+    async with rc.redis.pipeline(transaction=False) as pipe:
+        await pipe.incr(_OTP_SEND_PREFIX + body.phone)
+        await pipe.expire(_OTP_SEND_PREFIX + body.phone, 60)
+        await pipe.incr(_OTP_IP_PREFIX + client_ip)
+        await pipe.expire(_OTP_IP_PREFIX + client_ip, 300)
+        await pipe.execute()
+
+    logger.info("OTP sent: phone=***%s", body.phone[-4:])
+
+    # In production, call SMS gateway here.
+    # Only expose the code in DEMO_MODE.
+    resp: dict = {"ok": True}
+    if _DEMO_MODE:
+        resp["demo_code"] = code
+    return resp
 
 
 @router.post("/verify-otp")
 async def verify_otp(body: CustomerVerifyOTP, db: AsyncSession = Depends(get_db)):
-    """Verify OTP, create customer if new, return JWT."""
     stored = await rc.redis.get(_otp_key(body.phone))
     if not stored or stored != body.code:
         raise HTTPException(400, "验证码无效或已过期")
@@ -84,12 +121,12 @@ async def verify_otp(body: CustomerVerifyOTP, db: AsyncSession = Depends(get_db)
 
 @router.get("/me/orders", response_model=list[OrderOut])
 async def my_orders(
-    token: str,
     limit: int = 20,
+    credentials: HTTPAuthorizationCredentials = Depends(_customer_bearer),
     db: AsyncSession = Depends(get_db),
 ):
-    """Customer views their own order history across devices."""
-    payload = verify_customer_token(token)
+    """Customer views their own order history across devices. Requires Bearer token."""
+    payload = verify_customer_token(credentials.credentials)
     customer_id = payload["sub"]
     result = await db.execute(
         select(Order)
