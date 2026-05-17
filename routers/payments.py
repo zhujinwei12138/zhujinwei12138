@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import verify_admin
+from auth import require_merchant_scope, scoped_merchant_id, verify_admin
 from database import get_db
 from models import Order, Payment, Product
 from schemas import PaymentCreateIn, PaymentOut, RefundIn
@@ -49,11 +49,18 @@ def _txn_dedup_key(txn_id: str) -> str:
     return f"txn:processed:{txn_id}"
 
 
-@router.get("", response_model=list[PaymentOut], dependencies=[Depends(verify_admin)])
-async def list_payments(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Payment).order_by(Payment.created_at.desc()).offset(skip).limit(limit)
-    )
+@router.get("", response_model=list[PaymentOut])
+async def list_payments(
+    skip: int = 0,
+    limit: int = 200,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Payment).order_by(Payment.created_at.desc()).offset(skip).limit(limit)
+    mid = scoped_merchant_id(admin)
+    if mid is not None:
+        stmt = stmt.where(Payment.merchant_id == mid)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 
@@ -353,6 +360,7 @@ async def refund_payment(
     payment = await db.get(Payment, pay_id)
     if not payment:
         raise HTTPException(404, "Payment not found")
+    require_merchant_scope(admin, payment.merchant_id)
     if payment.status != "paid":
         raise HTTPException(400, "Only paid payments can be refunded")
 

@@ -14,11 +14,13 @@ class ProductIn(BaseModel):
     badge: Optional[str] = Field(None, max_length=20)
     gradient: str = ""
     stock: Optional[int] = Field(None, ge=0)  # None = 不限库存
+    merchant_id: Optional[int] = None  # super_admin may set; merchant_admin auto-filled from token
 
 
 class ProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    merchant_id: Optional[int] = None
     name: str
     description: str
     volume: str

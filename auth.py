@@ -81,3 +81,21 @@ def verify_super_admin(credentials: HTTPAuthorizationCredentials = Depends(_bear
     if payload.get("role") != "super_admin":
         raise HTTPException(403, "Super admin required")
     return payload
+
+
+# ── Multi-tenant scope helpers ────────────────────────────────────────────────
+
+def require_merchant_scope(admin: dict, resource_merchant_id: int) -> None:
+    """Raises 403 if a merchant_admin tries to access another merchant's resource."""
+    if admin.get("role") == "super_admin":
+        return
+    if admin.get("merchant_id") != resource_merchant_id:
+        raise HTTPException(403, "无权访问其他商家的资源")
+
+
+def scoped_merchant_id(admin: dict) -> Optional[int]:
+    """Returns merchant_id for merchant_admin (list filter), None for super_admin (no filter)."""
+    if admin.get("role") == "super_admin":
+        return None
+    return admin.get("merchant_id")
+

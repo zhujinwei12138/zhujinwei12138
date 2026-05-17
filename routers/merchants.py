@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import verify_admin
+from auth import require_merchant_scope, verify_admin, verify_super_admin
 from database import get_db
 from models import Merchant
 from schemas import MerchantIn, MerchantOut
@@ -22,25 +22,42 @@ async def get_merchant_public(merchant_id: int, db: AsyncSession = Depends(get_d
     return merchant
 
 
-@router.get("", response_model=list[MerchantOut], dependencies=[Depends(verify_admin)])
-async def list_merchants(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Merchant).order_by(Merchant.created_at).offset(skip).limit(limit))
-    return result.scalars().all()
+@router.get("", response_model=list[MerchantOut])
+async def list_merchants(
+    skip: int = 0,
+    limit: int = 200,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """super_admin: all merchants. merchant_admin: only their own."""
+    if admin.get("role") == "super_admin":
+        result = await db.execute(
+            select(Merchant).order_by(Merchant.created_at).offset(skip).limit(limit)
+        )
+        return result.scalars().all()
+
+    mid = admin.get("merchant_id")
+    if not mid:
+        return []
+    merchant = await db.get(Merchant, mid)
+    return [merchant] if merchant else []
 
 
 @router.post("", response_model=MerchantOut)
 async def create_merchant(
     body: MerchantIn,
     request: Request,
-    admin: dict = Depends(verify_admin),
+    admin: dict = Depends(verify_super_admin),  # only super_admin
     db: AsyncSession = Depends(get_db),
 ):
     merchant = Merchant(**body.model_dump())
     db.add(merchant)
     await db.flush()
-    await audit_record(db, actor=admin["sub"], action="CREATE", resource="merchants",
-                       resource_id=str(merchant.id), detail={"name": merchant.name},
-                       ip=request.client.host if request.client else None)
+    await audit_record(
+        db, actor=admin["sub"], action="CREATE", resource="merchants",
+        resource_id=str(merchant.id), detail={"name": merchant.name},
+        ip=request.client.host if request.client else None,
+    )
     await db.commit()
     await db.refresh(merchant)
     return merchant
@@ -54,13 +71,18 @@ async def update_merchant(
     admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    """super_admin: any merchant. merchant_admin: only their own."""
+    require_merchant_scope(admin, merchant_id)
     merchant = await db.get(Merchant, merchant_id)
     if not merchant:
         raise HTTPException(404, "Merchant not found")
     for k, v in body.model_dump(exclude_none=True).items():
         setattr(merchant, k, v)
-    await audit_record(db, actor=admin["sub"], action="UPDATE", resource="merchants",
-                       resource_id=str(merchant_id), ip=request.client.host if request.client else None)
+    await audit_record(
+        db, actor=admin["sub"], action="UPDATE", resource="merchants",
+        resource_id=str(merchant_id),
+        ip=request.client.host if request.client else None,
+    )
     await db.commit()
     await db.refresh(merchant)
     return merchant
@@ -70,15 +92,17 @@ async def update_merchant(
 async def delete_merchant(
     merchant_id: int,
     request: Request,
-    admin: dict = Depends(verify_admin),
+    admin: dict = Depends(verify_super_admin),  # only super_admin
     db: AsyncSession = Depends(get_db),
 ):
     merchant = await db.get(Merchant, merchant_id)
     if not merchant:
         raise HTTPException(404, "Merchant not found")
-    await audit_record(db, actor=admin["sub"], action="DELETE", resource="merchants",
-                       resource_id=str(merchant_id), detail={"name": merchant.name},
-                       ip=request.client.host if request.client else None)
+    await audit_record(
+        db, actor=admin["sub"], action="DELETE", resource="merchants",
+        resource_id=str(merchant_id), detail={"name": merchant.name},
+        ip=request.client.host if request.client else None,
+    )
     await db.delete(merchant)
     await db.commit()
     return {"ok": True}

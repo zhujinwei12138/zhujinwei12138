@@ -1,10 +1,11 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import verify_admin
+from auth import scoped_merchant_id, verify_admin
 from database import get_db
 from models import Merchant, Order, Payment
 from schemas import MerchantStats, SummaryStats
@@ -15,10 +16,14 @@ logger = logging.getLogger(__name__)
 PAID_STATUSES = ("paid", "preparing", "completed")
 
 
-@router.get("", response_model=list[MerchantStats], dependencies=[Depends(verify_admin)])
-async def merchant_stats(db: AsyncSession = Depends(get_db)):
-    # Aggregate order counts and revenue per merchant in SQL
-    rows = (await db.execute(
+@router.get("", response_model=list[MerchantStats])
+async def merchant_stats(
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    mid = scoped_merchant_id(admin)
+
+    stmt = (
         select(
             Merchant.id,
             Merchant.name,
@@ -28,20 +33,23 @@ async def merchant_stats(db: AsyncSession = Depends(get_db)):
         )
         .outerjoin(
             Order,
-            (Order.merchant_id == Merchant.id) & Order.status.in_(PAID_STATUSES)
+            (Order.merchant_id == Merchant.id) & Order.status.in_(PAID_STATUSES),
         )
         .group_by(Merchant.id, Merchant.name, Merchant.status)
-    )).all()
+    )
+    if mid is not None:
+        stmt = stmt.where(Merchant.id == mid)
 
-    # JSONB items need Python-side aggregation; fetch only minimal columns for paid orders
-    item_rows = (await db.execute(
-        select(Order.merchant_id, Order.items)
-        .where(Order.status.in_(PAID_STATUSES))
-    )).all()
+    rows = (await db.execute(stmt)).all()
+
+    item_stmt = select(Order.merchant_id, Order.items).where(Order.status.in_(PAID_STATUSES))
+    if mid is not None:
+        item_stmt = item_stmt.where(Order.merchant_id == mid)
+    item_rows = (await db.execute(item_stmt)).all()
 
     qty_map: dict[int, int] = {}
-    for mid, items in item_rows:
-        qty_map[mid] = qty_map.get(mid, 0) + sum(item["quantity"] for item in items)
+    for row_mid, items in item_rows:
+        qty_map[row_mid] = qty_map.get(row_mid, 0) + sum(item["quantity"] for item in items)
 
     return [
         MerchantStats(
@@ -56,57 +64,52 @@ async def merchant_stats(db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.get("/summary", response_model=SummaryStats, dependencies=[Depends(verify_admin)])
-async def summary_stats(db: AsyncSession = Depends(get_db)):
+@router.get("/summary", response_model=SummaryStats)
+async def summary_stats(
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
     today_end = today_start + timedelta(days=1)
+    mid: Optional[int] = scoped_merchant_id(admin)
 
-    order_agg = (await db.execute(
-        select(
-            func.count().label("total"),
-            func.sum(case((Order.status.in_(PAID_STATUSES), 1), else_=0)).label("paid"),
-            func.sum(case((Order.status == "pending_payment", 1), else_=0)).label("pending"),
-            func.sum(
-                case(
-                    ((Order.created_at >= today_start) & (Order.created_at < today_end), 1),
-                    else_=0,
-                )
-            ).label("today"),
-        )
-    )).one()
+    order_stmt = select(
+        func.count().label("total"),
+        func.sum(case((Order.status.in_(PAID_STATUSES), 1), else_=0)).label("paid"),
+        func.sum(case((Order.status == "pending_payment", 1), else_=0)).label("pending"),
+        func.sum(
+            case(
+                ((Order.created_at >= today_start) & (Order.created_at < today_end), 1),
+                else_=0,
+            )
+        ).label("today"),
+    )
+    if mid is not None:
+        order_stmt = order_stmt.where(Order.merchant_id == mid)
+    order_agg = (await db.execute(order_stmt)).one()
 
-    pay_agg = (await db.execute(
-        select(
-            func.coalesce(
-                func.sum(case((Payment.status == "paid", Payment.amount), else_=0)), 0
-            ).label("revenue"),
-            func.coalesce(
-                func.sum(case((Payment.status == "refunded", Payment.amount), else_=0)), 0
-            ).label("refund"),
-            func.coalesce(
-                func.sum(
-                    case(
-                        ((Payment.status == "paid") & (Payment.method == "wechat"), Payment.amount),
-                        else_=0,
-                    )
-                ),
-                0,
-            ).label("wechat"),
-            func.coalesce(
-                func.sum(
-                    case(
-                        ((Payment.status == "paid") & (Payment.method == "alipay"), Payment.amount),
-                        else_=0,
-                    )
-                ),
-                0,
-            ).label("alipay"),
-        )
-    )).one()
+    pay_stmt = select(
+        func.coalesce(func.sum(case((Payment.status == "paid", Payment.amount), else_=0)), 0).label("revenue"),
+        func.coalesce(func.sum(case((Payment.status == "refunded", Payment.amount), else_=0)), 0).label("refund"),
+        func.coalesce(
+            func.sum(case(((Payment.status == "paid") & (Payment.method == "wechat"), Payment.amount), else_=0)), 0
+        ).label("wechat"),
+        func.coalesce(
+            func.sum(case(((Payment.status == "paid") & (Payment.method == "alipay"), Payment.amount), else_=0)), 0
+        ).label("alipay"),
+    )
+    if mid is not None:
+        pay_stmt = pay_stmt.where(Payment.merchant_id == mid)
+    pay_agg = (await db.execute(pay_stmt)).one()
 
-    merchant_count = (await db.execute(
-        select(func.count()).where(Merchant.status == "active")
-    )).scalar_one()
+    if mid is not None:
+        # merchant_admin: count = 1 (their own) if active, else 0
+        merchant = await db.get(Merchant, mid)
+        merchant_count = 1 if merchant and merchant.status == "active" else 0
+    else:
+        merchant_count = (
+            await db.execute(select(func.count()).where(Merchant.status == "active"))
+        ).scalar_one()
 
     return SummaryStats(
         total_orders=order_agg.total or 0,

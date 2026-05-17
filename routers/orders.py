@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import verify_admin
+from auth import require_merchant_scope, scoped_merchant_id, verify_admin
 from database import get_db
 from models import Order, Product
 from schemas import OrderIn, OrderOut, OrderStatusIn
@@ -32,9 +32,18 @@ async def _publish_order_status(order_id: int, status: str) -> None:
     await rc.redis.publish(channel, json.dumps({"id": order_id, "status": status}))
 
 
-@router.get("", response_model=list[OrderOut], dependencies=[Depends(verify_admin)])
-async def list_orders(skip: int = 0, limit: int = 200, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Order).order_by(Order.id.desc()).offset(skip).limit(limit))
+@router.get("", response_model=list[OrderOut])
+async def list_orders(
+    skip: int = 0,
+    limit: int = 200,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Order).order_by(Order.id.desc()).offset(skip).limit(limit)
+    mid = scoped_merchant_id(admin)
+    if mid is not None:
+        stmt = stmt.where(Order.merchant_id == mid)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 
@@ -115,11 +124,16 @@ async def stream_order_status(order_id: int, request: Request, db: AsyncSession 
     )
 
 
-@router.get("/{order_id}", response_model=OrderOut, dependencies=[Depends(verify_admin)])
-async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/{order_id}", response_model=OrderOut)
+async def get_order(
+    order_id: int,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+    require_merchant_scope(admin, order.merchant_id)
     return order
 
 
@@ -162,6 +176,7 @@ async def update_order_status(
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+    require_merchant_scope(admin, order.merchant_id)
     allowed = ALLOWED_STATUS_TRANSITIONS.get(order.status, [])
     if body.status not in allowed:
         raise HTTPException(400, f"Cannot transition {order.status} → {body.status}")

@@ -5,7 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import check_credentials, check_password, create_admin_token, hash_password, verify_admin, verify_super_admin
+from auth import (
+    check_credentials, check_password, create_admin_token,
+    hash_password, verify_admin, verify_super_admin,
+)
 from database import get_db
 from models import AdminUser, AuditLog
 from schemas import AdminUserIn, AdminUserOut
@@ -167,17 +170,53 @@ async def delete_admin_user(
     return {"ok": True}
 
 
+# ── Self-service password change (merchant_admin can change own password) ─────
+
+class SelfPasswordIn(BaseModel):
+    old_password: str = Field(..., min_length=1, max_length=100)
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+@router.put("/me/password")
+async def change_own_password(
+    body: SelfPasswordIn,
+    request: Request,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """merchant_admin（或 super_admin）修改自己的密码，需提供旧密码验证。"""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.username == admin["sub"], AdminUser.is_active == True)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, "账号不存在或已停用")
+    if not check_password(body.old_password, user.password_hash):
+        raise HTTPException(400, "旧密码错误")
+    user.password_hash = hash_password(body.new_password)
+    await audit_record(
+        db, actor=admin["sub"], action="CHANGE_PASSWORD", resource="admin_users",
+        resource_id=str(user.id), ip=request.client.host if request.client else None,
+    )
+    await db.commit()
+    logger.info("AdminUser changed own password: username=%s", admin["sub"])
+    return {"ok": True}
+
+
 # ── Audit log viewer ──────────────────────────────────────────────────────────
 
-@router.get("/audit-logs", dependencies=[Depends(verify_admin)])
+@router.get("/audit-logs")
 async def list_audit_logs(
     skip: int = 0,
     limit: int = 100,
+    admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
-    )
+    """super_admin: all logs. merchant_admin: only their own actions."""
+    stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+    if admin.get("role") != "super_admin":
+        stmt = stmt.where(AuditLog.actor == admin["sub"])
+    result = await db.execute(stmt)
     rows = result.scalars().all()
     return [
         {

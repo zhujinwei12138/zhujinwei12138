@@ -9,8 +9,12 @@ from database import Base
 
 class Product(Base):
     __tablename__ = "products"
+    __table_args__ = (Index("ix_products_merchant_id", "merchant_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.id", ondelete="RESTRICT"), nullable=True
+    )  # NULL = platform product visible to all merchants
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
     volume: Mapped[str] = mapped_column(String(20), default="")

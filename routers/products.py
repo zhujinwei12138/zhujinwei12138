@@ -3,12 +3,12 @@ import logging
 import os
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import verify_admin
+from auth import require_merchant_scope, scoped_merchant_id, verify_admin
 from database import get_db
 from models import Product
 from schemas import ProductIn, ProductOut
@@ -22,7 +22,6 @@ _CACHE_PATTERN = "products:*"
 _MAX_SIZE = 5 * 1024 * 1024  # 5 MB
 _UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "uploads")
 
-# Allowed MIME types → canonical extension
 _ALLOWED_MIME: dict[str, str] = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -51,15 +50,32 @@ async def _invalidate_product_cache() -> None:
 
 
 @router.get("", response_model=list[ProductOut])
-async def list_products(category: Optional[str] = None, db: AsyncSession = Depends(get_db)):
-    cache_key = f"products:{category or 'all'}"
+async def list_products(
+    merchant_id: Optional[int] = Query(None),
+    category: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint.
+    - merchant_id provided: returns products for that merchant + platform products (merchant_id=NULL)
+    - merchant_id omitted: returns only platform products (backward compat)
+    """
+    cache_key = f"products:{merchant_id or 'global'}:{category or 'all'}"
     cached = await rc.redis.get(cache_key)
     if cached:
         return json.loads(cached)
 
-    stmt = select(Product).order_by(Product.id)
+    if merchant_id is not None:
+        # Products belonging to this merchant OR platform products (NULL merchant_id)
+        stmt = select(Product).where(
+            or_(Product.merchant_id == merchant_id, Product.merchant_id.is_(None))
+        )
+    else:
+        stmt = select(Product).where(Product.merchant_id.is_(None))
+
+    stmt = stmt.order_by(Product.id)
     if category and category != "全部":
         stmt = stmt.where(Product.category == category)
+
     result = await db.execute(stmt)
     products = result.scalars().all()
     data = [ProductOut.model_validate(p).model_dump(mode="json") for p in products]
@@ -75,16 +91,27 @@ async def create_product(
     admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    product = Product(**body.model_dump())
+    data = body.model_dump()
+    # merchant_admin: force merchant_id to their own, ignore body value
+    if admin.get("role") == "merchant_admin":
+        mid = admin.get("merchant_id")
+        if not mid:
+            raise HTTPException(403, "此账号未绑定商家，无法创建商品")
+        data["merchant_id"] = mid
+    # super_admin may leave merchant_id as None (platform product) or set a specific one
+    product = Product(**data)
     db.add(product)
     await db.flush()
-    await audit_record(db, actor=admin["sub"], action="CREATE", resource="products",
-                       resource_id=str(product.id), detail={"name": product.name},
-                       ip=request.client.host if request.client else None)
+    await audit_record(
+        db, actor=admin["sub"], action="CREATE", resource="products",
+        resource_id=str(product.id),
+        detail={"name": product.name, "merchant_id": product.merchant_id},
+        ip=request.client.host if request.client else None,
+    )
     await db.commit()
     await db.refresh(product)
     await _invalidate_product_cache()
-    logger.info("Product created: id=%s name=%s", product.id, product.name)
+    logger.info("Product created: id=%s name=%s merchant_id=%s", product.id, product.name, product.merchant_id)
     return product
 
 
@@ -99,10 +126,24 @@ async def update_product(
     product = await db.get(Product, product_id)
     if not product:
         raise HTTPException(404, "Product not found")
-    for k, v in body.model_dump().items():
+    # Platform products (merchant_id=None) can only be edited by super_admin
+    if product.merchant_id is None and admin.get("role") != "super_admin":
+        raise HTTPException(403, "平台商品只有超级管理员可以修改")
+    if product.merchant_id is not None:
+        require_merchant_scope(admin, product.merchant_id)
+
+    data = body.model_dump()
+    # merchant_admin cannot reassign a product to another merchant
+    if admin.get("role") == "merchant_admin":
+        data["merchant_id"] = product.merchant_id
+    for k, v in data.items():
         setattr(product, k, v)
-    await audit_record(db, actor=admin["sub"], action="UPDATE", resource="products",
-                       resource_id=str(product_id), ip=request.client.host if request.client else None)
+
+    await audit_record(
+        db, actor=admin["sub"], action="UPDATE", resource="products",
+        resource_id=str(product_id),
+        ip=request.client.host if request.client else None,
+    )
     await db.commit()
     await db.refresh(product)
     await _invalidate_product_cache()
@@ -120,6 +161,10 @@ async def upload_product_image(
     product = await db.get(Product, product_id)
     if not product:
         raise HTTPException(404, "Product not found")
+    if product.merchant_id is None and admin.get("role") != "super_admin":
+        raise HTTPException(403, "平台商品只有超级管理员可以修改")
+    if product.merchant_id is not None:
+        require_merchant_scope(admin, product.merchant_id)
 
     content_type = file.content_type or ""
     if content_type not in _ALLOWED_MIME:
@@ -128,20 +173,16 @@ async def upload_product_image(
     content = await file.read()
     if len(content) > _MAX_SIZE:
         raise HTTPException(400, "图片大小不能超过 5 MB")
-
     if not _verify_image_magic(content):
         raise HTTPException(400, "文件内容与声明的格式不符")
 
     os.makedirs(_UPLOAD_DIR, exist_ok=True)
-
-    # Use UUID filename — never trust user-supplied filename
     ext = _ALLOWED_MIME[content_type]
     filename = f"product_{product_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(_UPLOAD_DIR, filename)
     with open(filepath, "wb") as f:
         f.write(content)
 
-    # Remove old image file if it's a local upload
     if product.image_url and product.image_url.startswith("/uploads/"):
         old_path = os.path.join(_UPLOAD_DIR, os.path.basename(product.image_url))
         if os.path.isfile(old_path):
@@ -165,9 +206,16 @@ async def delete_product(
     product = await db.get(Product, product_id)
     if not product:
         raise HTTPException(404, "Product not found")
-    await audit_record(db, actor=admin["sub"], action="DELETE", resource="products",
-                       resource_id=str(product_id), detail={"name": product.name},
-                       ip=request.client.host if request.client else None)
+    if product.merchant_id is None and admin.get("role") != "super_admin":
+        raise HTTPException(403, "平台商品只有超级管理员可以删除")
+    if product.merchant_id is not None:
+        require_merchant_scope(admin, product.merchant_id)
+
+    await audit_record(
+        db, actor=admin["sub"], action="DELETE", resource="products",
+        resource_id=str(product_id), detail={"name": product.name},
+        ip=request.client.host if request.client else None,
+    )
     await db.delete(product)
     await db.commit()
     await _invalidate_product_cache()

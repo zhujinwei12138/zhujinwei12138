@@ -33,22 +33,10 @@ async def seed_if_empty():
         if (await db.execute(select(Product))).first():
             return
 
-        # ── Products ──────────────────────────────────────
-        for p in _load("products.json"):
-            db.add(Product(
-                id=p["id"],
-                name=p["name"],
-                description=p.get("description", ""),
-                volume=p.get("volume", ""),
-                alcohol=p.get("alcohol", ""),
-                price=p["price"],
-                category=p["category"],
-                badge=p.get("badge") or None,
-                gradient=p.get("gradient", ""),
-            ))
-
-        # ── Merchants ─────────────────────────────────────
-        for m in _load("merchants.json"):
+        # ── Merchants（先于 Products，因为 products.merchant_id 有外键）────────
+        merchants_data = _load("merchants.json")
+        first_merchant_id = merchants_data[0]["id"] if merchants_data else 1
+        for m in merchants_data:
             db.add(Merchant(
                 id=m["id"],
                 name=m["name"],
@@ -57,6 +45,24 @@ async def seed_if_empty():
                 table_count=m.get("tableCount", 10),
                 status=m.get("status", "active"),
                 created_at=_parse_dt(m.get("createdAt")) or datetime.now(timezone.utc),
+            ))
+
+        # ── Flush merchants so FK resolves for products ───────────────────────
+        await db.flush()
+
+        # ── Products（归属第一个商家作为默认示例数据）─────────────────────────
+        for p in _load("products.json"):
+            db.add(Product(
+                id=p["id"],
+                merchant_id=first_merchant_id,
+                name=p["name"],
+                description=p.get("description", ""),
+                volume=p.get("volume", ""),
+                alcohol=p.get("alcohol", ""),
+                price=p["price"],
+                category=p["category"],
+                badge=p.get("badge") or None,
+                gradient=p.get("gradient", ""),
             ))
 
         # ── Orders ────────────────────────────────────────
