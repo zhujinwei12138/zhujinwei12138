@@ -1,0 +1,176 @@
+/* Global styles */
+page {
+  background-color: #f9fafb;
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  font-size: 28rpx;
+  color: #111827;
+  box-sizing: border-box;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Utility */
+.flex { display: flex; }
+.flex-1 { flex: 1; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+/* Colors */
+.text-amber { color: #f59e0b; }
+.text-gray { color: #6b7280; }
+.text-dark { color: #111827; }
+.text-white { color: #ffffff; }
+.text-red { color: #ef4444; }
+.text-green { color: #16a34a; }
+
+/* Buttons */
+.btn-amber {
+  background: #f59e0b;
+  color: #ffffff;
+  border-radius: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border: none;
+}
+
+.btn-amber::after { border: none; }
+
+.btn-outline {
+  background: transparent;
+  color: #f59e0b;
+  border: 2rpx solid #f59e0b;
+  border-radius: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+.btn-outline::after { border: none; }
+
+/* Card */
+.card {
+  background: #ffffff;
+  border-radius: 24rpx;
+  border: 1rpx solid #fef3c7;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+/* Custom Tab Bar */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top: 1rpx solid #f3f4f6;
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.tab-bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 0 12rpx;
+  position: relative;
+}
+
+.tab-bar-item .tab-icon {
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.tab-bar-item .tab-label {
+  font-size: 20rpx;
+  margin-top: 4rpx;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.tab-bar-item.active .tab-label {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.tab-bar-item .tab-badge {
+  position: absolute;
+  top: 8rpx;
+  left: 50%;
+  margin-left: 10rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  background: #ef4444;
+  border-radius: 16rpx;
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6rpx;
+}
+
+/* Toast override */
+.custom-toast {
+  position: fixed;
+  top: 100rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30,30,30,0.85);
+  color: #fff;
+  padding: 16rpx 32rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* Section header */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 32rpx 12rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+  color: #d1d5db;
+}
+
+.empty-icon {
+  font-size: 100rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #9ca3af;
+}
+
+.empty-sub {
+  font-size: 24rpx;
+  color: #d1d5db;
+  margin-top: 8rpx;
+}

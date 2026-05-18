@@ -1,0 +1,91 @@
+<!-- pages/payment/index.wxml -->
+<view class="page">
+
+  <!-- Payment Success -->
+  <view wx:if="{{payStatus === 'paid'}}" class="success-screen">
+    <view class="success-circle">✓</view>
+    <text class="success-title">支付成功！</text>
+    <text class="success-sub">商家正在为您备餐，请稍候</text>
+    <view class="success-btn btn-amber" bindtap="onBackHome">返回首页</view>
+  </view>
+
+  <!-- Payment Expired/Failed -->
+  <view wx:elif="{{payStatus === 'expired' || payStatus === 'failed'}}" class="fail-screen">
+    <view class="fail-icon">⏰</view>
+    <text class="fail-title">{{payStatus === 'expired' ? '支付已超时' : '支付失败'}}</text>
+    <text class="fail-sub">请重新发起支付</text>
+    <view class="fail-btn btn-amber" bindtap="onRetry">重新支付</view>
+    <view class="fail-back" bindtap="onBackHome">返回首页</view>
+  </view>
+
+  <!-- Polling / Waiting for payment -->
+  <view wx:elif="{{payStatus === 'pending'}}" class="pending-screen">
+    <view class="pending-icon">💳</view>
+    <text class="pending-title">等待支付中</text>
+    <text class="pending-sub">订单号：{{orderId}}</text>
+    <text class="pending-amount">¥{{total.toFixed(2)}}</text>
+
+    <view class="polling-indicator">
+      <text class="polling-dot">●</text>
+      <text class="polling-text">正在检查支付状态…</text>
+    </view>
+
+    <!-- Mock Pay Button (shown always in dev mode) -->
+    <view class="mock-section">
+      <text class="mock-tip">（开发测试模式）</text>
+      <button class="btn-amber mock-btn" bindtap="onMockPay">
+        模拟支付成功
+      </button>
+    </view>
+  </view>
+
+  <!-- Initial — Choose payment method -->
+  <view wx:else class="payment-form">
+    <!-- Order summary -->
+    <view class="order-summary card">
+      <view class="summary-row">
+        <text class="summary-label">订单号</text>
+        <text class="summary-value">#{{orderId}}</text>
+      </view>
+      <view class="divider"></view>
+      <view class="summary-row total-row">
+        <text class="summary-label">支付金额</text>
+        <text class="summary-amount">¥{{total.toFixed(2)}}</text>
+      </view>
+    </view>
+
+    <!-- Payment method -->
+    <text class="section-title">选择支付方式</text>
+    <view class="methods">
+      <view class="method-item {{payMethod === 'wechat' ? 'method-active' : ''}}"
+        bindtap="selectMethod" data-method="wechat">
+        <text class="method-icon">💚</text>
+        <view class="method-info">
+          <text class="method-name">微信支付</text>
+          <text class="method-desc">推荐使用</text>
+        </view>
+        <view class="method-radio {{payMethod === 'wechat' ? 'radio-active' : ''}}"></view>
+      </view>
+
+      <view class="method-item {{payMethod === 'alipay' ? 'method-active' : ''}}"
+        bindtap="selectMethod" data-method="alipay">
+        <text class="method-icon">💙</text>
+        <view class="method-info">
+          <text class="method-name">支付宝</text>
+          <text class="method-desc">安全快捷</text>
+        </view>
+        <view class="method-radio {{payMethod === 'alipay' ? 'radio-active' : ''}}"></view>
+      </view>
+    </view>
+
+    <!-- Confirm Button -->
+    <button class="btn-amber pay-btn"
+      disabled="{{payStatus === 'creating'}}"
+      bindtap="onCreatePayment">
+      {{payStatus === 'creating' ? '处理中…' : '确认支付 ¥' + total.toFixed(2)}}
+    </button>
+
+    <text class="safe-hint">🔒 支付安全由微信/支付宝保障</text>
+  </view>
+
+</view>
