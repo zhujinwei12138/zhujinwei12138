@@ -8,6 +8,7 @@ from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pythonjsonlogger import jsonlogger
 from sqlalchemy import text
@@ -149,6 +150,12 @@ _uploads_dir = os.path.join(_base, "public", "uploads")
 os.makedirs(_uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
-# Static frontends — mounted AFTER API routes so /api/* is never shadowed
-app.mount("/customer", StaticFiles(directory=os.path.join(_base, "public/customer"), html=True), name="customer")
-app.mount("/admin", StaticFiles(directory=os.path.join(_base, "public/admin"), html=True), name="admin")
+# React SPA — serve built assets from frontend/dist, SPA fallback for all other routes
+_dist = os.path.join(_base, "frontend", "dist")
+if os.path.isdir(_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_dist, "assets")), name="spa_assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        index = os.path.join(_dist, "index.html")
+        return FileResponse(index)

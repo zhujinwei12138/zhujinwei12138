@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -124,6 +125,40 @@ async def update_admin_user(
     user.password_hash = hash_password(body.password)
     user.role = body.role
     user.merchant_id = body.merchant_id
+    await audit_record(db, actor=admin["sub"], action="UPDATE", resource="admin_users",
+                       resource_id=str(user_id), ip=request.client.host if request.client else None)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+class AdminUserPatch(BaseModel):
+    username: Optional[str] = None
+    role: Optional[str] = None
+    merchant_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserOut)
+async def patch_admin_user(
+    user_id: int,
+    body: AdminUserPatch,
+    request: Request,
+    admin: dict = Depends(verify_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update admin user fields without requiring password."""
+    user = await db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    if body.username is not None:
+        user.username = body.username
+    if body.role is not None:
+        user.role = body.role
+    if body.merchant_id is not None:
+        user.merchant_id = body.merchant_id
+    if body.is_active is not None:
+        user.is_active = body.is_active
     await audit_record(db, actor=admin["sub"], action="UPDATE", resource="admin_users",
                        resource_id=str(user_id), ip=request.client.host if request.client else None)
     await db.commit()
