@@ -5,7 +5,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "change-this-before-production")
@@ -73,6 +73,21 @@ def _decode_token(token: str) -> dict:
 def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
     """Allows both super_admin and merchant_admin."""
     return _decode_token(credentials.credentials)
+
+
+_bearer_optional = HTTPBearer(auto_error=False)
+
+
+def verify_admin_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_optional),
+) -> Optional[dict]:
+    """Like verify_admin but returns None instead of 401 when no token is present."""
+    if credentials is None:
+        return None
+    try:
+        return _decode_token(credentials.credentials)
+    except HTTPException:
+        return None
 
 
 def verify_super_admin(credentials: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:

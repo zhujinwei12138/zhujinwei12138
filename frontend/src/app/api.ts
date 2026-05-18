@@ -6,6 +6,8 @@ function getToken(): string | null {
   return localStorage.getItem("adminToken");
 }
 
+// auth=true: add token and redirect to login on 401
+// auth=false: add token if present (for public endpoints that return richer data when authenticated)
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -15,10 +17,9 @@ async function request<T>(
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (auth) {
-    const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  }
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(BASE + path, { ...options, headers });
   if (res.status === 401 && auth) {
     localStorage.removeItem("adminToken");
@@ -50,10 +51,7 @@ export interface APIMerchant {
 }
 
 export async function getMerchants(): Promise<APIMerchant[]> {
-  return request("/api/merchants", {}, true);
-}
-export async function getMerchantsPublic(): Promise<APIMerchant[]> {
-  return request("/api/merchants");
+  return request("/api/merchants", {}, false); // public endpoint; auth header added automatically if token present
 }
 export async function createMerchant(data: Omit<APIMerchant, "id" | "created_at">): Promise<APIMerchant> {
   return request("/api/merchants", { method: "POST", body: JSON.stringify(data) }, true);
@@ -98,7 +96,7 @@ export interface APIOrder {
 }
 export interface CreateOrderBody {
   merchant_id: number; table_no: string;
-  items: { product_id: number; quantity: number; price: number }[];
+  items: { id: number; name: string; price: number; quantity: number }[];
   total: number;
 }
 

@@ -1,10 +1,11 @@
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import require_merchant_scope, verify_admin, verify_super_admin
+from auth import require_merchant_scope, verify_admin, verify_admin_optional, verify_super_admin
 from database import get_db
 from models import Merchant
 from schemas import MerchantIn, MerchantOut
@@ -26,10 +27,17 @@ async def get_merchant_public(merchant_id: int, db: AsyncSession = Depends(get_d
 async def list_merchants(
     skip: int = 0,
     limit: int = 200,
-    admin: dict = Depends(verify_admin),
+    admin: Optional[dict] = Depends(verify_admin_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    """super_admin: all merchants. merchant_admin: only their own."""
+    """Public (unauthenticated): returns active merchants only.
+    Authenticated admin: super_admin gets all, merchant_admin gets own."""
+    if admin is None:
+        result = await db.execute(
+            select(Merchant).where(Merchant.status == "active").order_by(Merchant.created_at)
+        )
+        return result.scalars().all()
+
     if admin.get("role") == "super_admin":
         result = await db.execute(
             select(Merchant).order_by(Merchant.created_at).offset(skip).limit(limit)

@@ -200,8 +200,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reloadMerchants = useCallback(async () => {
     setLoadingMerchants(true);
     try {
-      let raw: API.APIMerchant[];
-      try { raw = await API.getMerchants(); } catch { raw = await API.getMerchantsPublic(); }
+      // Endpoint is public (no-auth returns active only, auth returns all/scoped)
+      const raw = await API.getMerchants();
       setMerchants(raw.map(adaptMerchant));
     } catch (e) {
       console.error("Failed to load merchants", e);
@@ -296,7 +296,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const res = await API.createOrder({
       merchant_id: Number(order.merchantId),
       table_no: order.tableNo,
-      items: order.items.map((i) => ({ product_id: i.beerId, quantity: i.quantity, price: i.price })),
+      items: order.items.map((i) => ({ id: i.beerId, name: i.beerName, price: i.price, quantity: i.quantity })),
       total: order.total,
     });
     const newOrder: SalesOrder = {
