@@ -70,6 +70,7 @@ Page({
       statusLabel: ORDER_STATUS_LABELS[o.status] || o.status,
       formattedTime: formatDate(o.created_at),
       itemsSummary: (o.items || []).map(i => `${i.name}×${i.quantity}`).join('、'),
+      totalStr: Number(o.total).toFixed(2),
     }));
     this.setData({ filteredOrders: filtered });
   },

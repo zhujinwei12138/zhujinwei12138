@@ -10,6 +10,7 @@ Page({
     cart: [],
     cartCount: 0,
     cartTotal: 0,
+    cartTotalStr: '0.00',
   },
 
   onLoad(options) {
@@ -17,11 +18,13 @@ Page({
     this.productId = id;
     const cart = app.globalData.cart;
     const item = cart.find(i => String(i.id) === String(id));
+    const cartTotal = getCartTotal(cart);
     this.setData({
       cart,
       qty: item ? item.quantity : 0,
       cartCount: getCartCount(cart),
-      cartTotal: getCartTotal(cart),
+      cartTotal,
+      cartTotalStr: cartTotal.toFixed(2),
     });
     this.loadProduct(id);
   },
@@ -48,14 +51,16 @@ Page({
     const { product } = this.data;
     const cart = app.addToCart(product);
     const item = cart.find(i => i.id === product.id);
-    this.setData({ cart, qty: item ? item.quantity : 0, cartCount: getCartCount(cart), cartTotal: getCartTotal(cart) });
+    const cartTotal = getCartTotal(cart);
+    this.setData({ cart, qty: item ? item.quantity : 0, cartCount: getCartCount(cart), cartTotal, cartTotalStr: cartTotal.toFixed(2) });
   },
 
   onReduce() {
     const { product, qty } = this.data;
     if (qty <= 0) return;
     const cart = app.updateCartQuantity(product.id, qty - 1);
-    this.setData({ cart, qty: qty - 1, cartCount: getCartCount(cart), cartTotal: getCartTotal(cart) });
+    const cartTotal = getCartTotal(cart);
+    this.setData({ cart, qty: qty - 1, cartCount: getCartCount(cart), cartTotal, cartTotalStr: cartTotal.toFixed(2) });
   },
 
   onCartTap() {

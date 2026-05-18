@@ -6,19 +6,24 @@ Page({
   data: {
     orderId: null,
     total: 0,
+    totalStr: '0.00',
+    confirmBtnText: '确认支付',
     payMethod: 'wechat',
     payId: null,
     payStatus: 'idle',   // idle | creating | pending | paid | expired | failed
     pollCount: 0,
-    isMockMode: true,    // will be confirmed after creating payment
   },
 
   pollTimer: null,
 
   onLoad(options) {
+    const total = parseFloat(options.total) || 0;
+    const totalStr = total.toFixed(2);
     this.setData({
       orderId: options.orderId,
-      total: parseFloat(options.total) || 0,
+      total,
+      totalStr,
+      confirmBtnText: `确认支付 ¥${totalStr}`,
     });
   },
 
@@ -38,7 +43,7 @@ Page({
     const { orderId, payMethod, payStatus } = this.data;
     if (payStatus === 'creating' || payStatus === 'pending') return;
 
-    this.setData({ payStatus: 'creating' });
+    this.setData({ payStatus: 'creating', confirmBtnText: '处理中…' });
     wx.showLoading({ title: '创建支付…' });
 
     try {
@@ -121,7 +126,8 @@ Page({
   },
 
   onRetry() {
-    this.setData({ payStatus: 'idle', payId: null });
+    const { total } = this.data;
+    this.setData({ payStatus: 'idle', payId: null, confirmBtnText: `确认支付 ¥${total.toFixed(2)}` });
   },
 
   onBackHome() {

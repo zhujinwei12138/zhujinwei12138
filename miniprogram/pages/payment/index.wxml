@@ -23,7 +23,7 @@
     <view class="pending-icon">💳</view>
     <text class="pending-title">等待支付中</text>
     <text class="pending-sub">订单号：{{orderId}}</text>
-    <text class="pending-amount">¥{{total.toFixed(2)}}</text>
+    <text class="pending-amount">¥{{totalStr}}</text>
 
     <view class="polling-indicator">
       <text class="polling-dot">●</text>
@@ -50,7 +50,7 @@
       <view class="divider"></view>
       <view class="summary-row total-row">
         <text class="summary-label">支付金额</text>
-        <text class="summary-amount">¥{{total.toFixed(2)}}</text>
+        <text class="summary-amount">¥{{totalStr}}</text>
       </view>
     </view>
 
@@ -82,7 +82,7 @@
     <button class="btn-amber pay-btn"
       disabled="{{payStatus === 'creating'}}"
       bindtap="onCreatePayment">
-      {{payStatus === 'creating' ? '处理中…' : '确认支付 ¥' + total.toFixed(2)}}
+      {{confirmBtnText}}
     </button>
 
     <text class="safe-hint">🔒 支付安全由微信/支付宝保障</text>

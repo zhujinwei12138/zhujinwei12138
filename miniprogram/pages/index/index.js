@@ -20,6 +20,7 @@ Page({
     cart: [],
     cartCount: 0,
     cartTotal: 0,
+    cartTotalStr: '0.00',
     activeTab: 'home',
   },
 
@@ -27,17 +28,19 @@ Page({
     const { merchantId, merchantName, tableNo, cart } = app.globalData;
     const cartCount = getCartCount(cart);
     const cartTotal = getCartTotal(cart);
-    this.setData({ merchantId, merchantName, tableNo, cart, cartCount, cartTotal });
+    this.setData({ merchantId, merchantName, tableNo, cart, cartCount, cartTotal, cartTotalStr: cartTotal.toFixed(2) });
 
     this.loadMerchants();
   },
 
   onShow() {
     const cart = app.globalData.cart;
+    const cartTotal = getCartTotal(cart);
     this.setData({
       cart,
       cartCount: getCartCount(cart),
-      cartTotal: getCartTotal(cart),
+      cartTotal,
+      cartTotalStr: cartTotal.toFixed(2),
       merchantId: app.globalData.merchantId,
       merchantName: app.globalData.merchantName,
       tableNo: app.globalData.tableNo,
@@ -140,23 +143,30 @@ Page({
   onAddToCart(e) {
     const product = e.currentTarget.dataset.product;
     const cart = app.addToCart(product);
+    const cartTotal = getCartTotal(cart);
     this.setData({
       cart,
       cartCount: getCartCount(cart),
-      cartTotal: getCartTotal(cart),
+      cartTotal,
+      cartTotalStr: cartTotal.toFixed(2),
       products: this.mergeQty(this.data.products),
     });
   },
+
+  // catchtap handler — prevents card tap from firing when tapping price/qty area
+  stopPropagation() {},
 
   onReduceFromCart(e) {
     const productId = e.currentTarget.dataset.id;
     const item = app.globalData.cart.find(i => i.id === productId);
     if (!item) return;
     const cart = app.updateCartQuantity(productId, item.quantity - 1);
+    const cartTotal = getCartTotal(cart);
     this.setData({
       cart,
       cartCount: getCartCount(cart),
-      cartTotal: getCartTotal(cart),
+      cartTotal,
+      cartTotalStr: cartTotal.toFixed(2),
       products: this.mergeQty(this.data.products),
     });
   },

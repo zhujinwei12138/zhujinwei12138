@@ -43,7 +43,7 @@
 
       <!-- Footer -->
       <view class="order-footer">
-        <text class="order-total">合计 <text class="total-amount">¥{{item.total}}</text></text>
+        <text class="order-total">合计 <text class="total-amount">¥{{item.totalStr}}</text></text>
         <view class="order-actions">
           <view wx:if="{{item.status === 'pending_payment'}}"
             class="action-btn btn-amber"

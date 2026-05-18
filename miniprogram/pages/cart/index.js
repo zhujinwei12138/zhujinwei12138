@@ -6,6 +6,7 @@ Page({
   data: {
     cart: [],
     cartTotal: 0,
+    cartTotalStr: '0.00',
     merchantId: null,
     merchantName: '',
     tableNo: '',
@@ -22,9 +23,11 @@ Page({
 
   refreshCart() {
     const cart = app.globalData.cart;
+    const cartTotal = getCartTotal(cart);
     this.setData({
       cart,
-      cartTotal: getCartTotal(cart),
+      cartTotal,
+      cartTotalStr: cartTotal.toFixed(2),
       merchantId: app.globalData.merchantId,
       merchantName: app.globalData.merchantName,
       tableNo: app.globalData.tableNo,
@@ -36,7 +39,8 @@ Page({
     const item = this.data.cart.find(i => i.id === id);
     if (!item) return;
     const cart = app.updateCartQuantity(id, item.quantity + 1);
-    this.setData({ cart, cartTotal: getCartTotal(cart) });
+    const cartTotal = getCartTotal(cart);
+    this.setData({ cart, cartTotal, cartTotalStr: cartTotal.toFixed(2) });
   },
 
   onDecrease(e) {
@@ -44,7 +48,8 @@ Page({
     const item = this.data.cart.find(i => i.id === id);
     if (!item) return;
     const cart = app.updateCartQuantity(id, item.quantity - 1);
-    this.setData({ cart, cartTotal: getCartTotal(cart) });
+    const cartTotal = getCartTotal(cart);
+    this.setData({ cart, cartTotal, cartTotalStr: cartTotal.toFixed(2) });
   },
 
   onClearCart() {

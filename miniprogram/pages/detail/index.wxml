@@ -52,6 +52,6 @@
 
   <!-- Cart Bar at bottom -->
   <view class="cart-hint" wx:if="{{cartCount > 0}}" bindtap="onCartTap">
-    <text class="cart-hint-text">🛒 购物车 {{cartCount}} 件 · ¥{{cartTotal.toFixed(2)}} → 去结算</text>
+    <text class="cart-hint-text">🛒 购物车 {{cartCount}} 件 · ¥{{cartTotalStr}} → 去结算</text>
   </view>
 </view>
