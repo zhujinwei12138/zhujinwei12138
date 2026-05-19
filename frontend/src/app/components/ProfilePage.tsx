@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, ChevronRight, ShoppingCart, User, Shield, Package,
   Clock, Truck, Star, RefreshCw, Plus, Minus, Trash2, X,
-  Check, ChevronDown, MapPin,
+  Check, ChevronDown, MapPin, CreditCard,
 } from "lucide-react";
 import { useData, OrderStatus } from "../context/DataContext";
+import * as API from "../api";
 
 export type ProfileView = "main" | "orders" | "cart" | "personalinfo" | "security";
 
@@ -46,6 +47,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
   const [reviewTarget, setReviewTarget] = useState<string | null>(null);
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
+  const [payTarget, setPayTarget] = useState<{ orderId: string; total: number } | null>(null);
 
   const myOrders = orders.filter((o) => myOrderIds.includes(o.id));
   const tabOrders = myOrders.filter((o) => o.status === activeTab);
@@ -116,7 +118,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                   {order.status === "pending" && (
                     <>
                       <button onClick={() => updateOrderStatus(order.id, "cancelled")} className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-xs">取消订单</button>
-                      <button onClick={() => updateOrderStatus(order.id, "preparing")} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去付款</button>
+                      <button onClick={() => setPayTarget({ orderId: order.id, total: order.total })} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去付款</button>
                     </>
                   )}
                   {order.status === "preparing" && (
@@ -134,6 +136,16 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
           ))
         )}
       </div>
+
+      {/* Payment Modal */}
+      {payTarget && (
+        <PaymentModal
+          orderId={payTarget.orderId}
+          total={payTarget.total}
+          onPaid={() => setPayTarget(null)}
+          onClose={() => setPayTarget(null)}
+        />
+      )}
 
       {/* Review Modal */}
       {reviewTarget && (
@@ -165,6 +177,156 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ─── Payment Modal ────────────────────────────────────────────────────────────
+type PayState = "choosing" | "waiting" | "paid" | "failed";
+
+interface PaymentModalProps {
+  orderId: string;
+  total: number;
+  onPaid: () => void;
+  onClose: () => void;
+}
+
+function PaymentModal({ orderId, total, onPaid, onClose }: PaymentModalProps) {
+  const [payMethod, setPayMethod] = useState<"wechat" | "alipay">("wechat");
+  const [payState, setPayState] = useState<PayState>("choosing");
+  const [payId, setPayId] = useState<number | null>(null);
+  const [errMsg, setErrMsg] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  useEffect(() => () => stopPoll(), []);
+
+  const startPolling = (pid: number) => {
+    stopPoll();
+    pollRef.current = setInterval(async () => {
+      try {
+        const { status } = await API.getPayment(pid);
+        if (status === "paid") {
+          stopPoll();
+          setPayState("paid");
+          setTimeout(onPaid, 1200);
+        } else if (status === "expired" || status === "failed") {
+          stopPoll();
+          setPayState("failed");
+        }
+      } catch { /* keep polling on transient errors */ }
+    }, 2000);
+  };
+
+  const handleConfirmPay = async () => {
+    setPayState("waiting");
+    setErrMsg("");
+    try {
+      const { pay_id } = await API.createPayment(Number(orderId), payMethod);
+      setPayId(pay_id);
+      startPolling(pay_id);
+    } catch (e) {
+      setPayState("failed");
+      setErrMsg(e instanceof Error ? e.message : "创建支付失败");
+    }
+  };
+
+  const handleMockPay = async () => {
+    if (!payId) return;
+    try {
+      await API.mockPay(payId);
+    } catch { /* mock-pay may return non-200 if already paid, ignore */ }
+  };
+
+  const handleRetry = () => {
+    stopPoll();
+    setPayState("choosing");
+    setPayId(null);
+    setErrMsg("");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md rounded-t-3xl p-6 pb-8">
+
+        {/* Paid */}
+        {payState === "paid" && (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Check size={32} className="text-green-500" />
+            </div>
+            <p className="text-gray-900 text-lg" style={{ fontWeight: 700 }}>支付成功！</p>
+            <p className="text-gray-400 text-sm mt-1">商家正在为您备餐，请稍候</p>
+          </div>
+        )}
+
+        {/* Failed */}
+        {payState === "failed" && (
+          <div className="text-center py-4">
+            <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <X size={28} className="text-red-400" />
+            </div>
+            <p className="text-gray-900" style={{ fontWeight: 700 }}>支付失败</p>
+            {errMsg && <p className="text-red-400 text-xs mt-1">{errMsg}</p>}
+            <div className="flex gap-3 mt-4">
+              <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-500 py-3 rounded-2xl text-sm">取消订单</button>
+              <button onClick={handleRetry} className="flex-1 bg-amber-500 text-white py-3 rounded-2xl text-sm" style={{ fontWeight: 600 }}>重新支付</button>
+            </div>
+          </div>
+        )}
+
+        {/* Waiting for payment */}
+        {payState === "waiting" && (
+          <div className="text-center py-4">
+            <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <CreditCard size={26} className="text-amber-500" />
+            </div>
+            <p className="text-gray-900" style={{ fontWeight: 700 }}>等待支付</p>
+            <p className="text-gray-400 text-sm mt-1">订单号 #{orderId} · ¥{total.toFixed(2)}</p>
+            <div className="flex items-center justify-center gap-2 mt-3 text-gray-400 text-xs">
+              <span className="animate-pulse">●</span>
+              <span>正在检测支付状态…</span>
+            </div>
+            <div className="mt-5 p-4 bg-amber-50 rounded-2xl">
+              <p className="text-amber-600 text-xs mb-2" style={{ fontWeight: 500 }}>（开发测试模式）</p>
+              <button onClick={handleMockPay} className="w-full bg-amber-500 text-white py-3 rounded-xl text-sm" style={{ fontWeight: 600 }}>
+                模拟支付成功
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Choose payment method */}
+        {payState === "choosing" && (
+          <>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-gray-900" style={{ fontWeight: 700 }}>选择支付方式</h3>
+              <button onClick={onClose} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500"><X size={16} /></button>
+            </div>
+            <div className="bg-amber-50 rounded-2xl px-4 py-3 mb-4 text-center">
+              <p className="text-gray-400 text-xs">订单号 #{orderId}</p>
+              <p className="text-amber-600 mt-0.5" style={{ fontWeight: 700, fontSize: "1.5rem" }}>¥{total.toFixed(2)}</p>
+            </div>
+            <div className="space-y-2 mb-5">
+              {(["wechat", "alipay"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setPayMethod(m)}
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all ${payMethod === m ? "border-amber-400 bg-amber-50" : "border-gray-100 bg-white"}`}
+                >
+                  <span className="text-xl">{m === "wechat" ? "💚" : "💙"}</span>
+                  <span className="text-gray-800 text-sm flex-1 text-left" style={{ fontWeight: 500 }}>{m === "wechat" ? "微信支付" : "支付宝"}</span>
+                  <div className={`w-4 h-4 rounded-full border-2 ${payMethod === m ? "border-amber-500 bg-amber-500" : "border-gray-300"}`} />
+                </button>
+              ))}
+            </div>
+            <button onClick={handleConfirmPay} className="w-full bg-amber-500 text-white py-3.5 rounded-2xl" style={{ fontWeight: 600 }}>
+              确认支付 ¥{total.toFixed(2)}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Cart Page ────────────────────────────────────────────────────────────────
 interface CartPageProps {
   onBack: () => void;
@@ -177,7 +339,7 @@ interface CartPageProps {
 function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }: CartPageProps) {
   const { cart, removeFromCart, updateCartQuantity, clearCart, addOrder, addMyOrderId } = useData();
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const [successAnim, setSuccessAnim] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<{ orderId: string; total: number } | null>(null);
 
   const handleCheckout = async () => {
     if (cart.length === 0 || !merchantId) return;
@@ -191,28 +353,29 @@ function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }:
       });
       addMyOrderId(orderId);
       clearCart();
-      setSuccessAnim(true);
-      setTimeout(() => { setSuccessAnim(false); onOrderSuccess(orderId); }, 1200);
+      setPendingPayment({ orderId, total });
     } catch (e) {
       console.error("Checkout failed", e);
       alert("下单失败，请重试");
     }
   };
 
+  const handlePaid = () => {
+    setPendingPayment(null);
+    onOrderSuccess(pendingPayment?.orderId ?? "");
+  };
+
   return (
     <div className="flex flex-col flex-1 bg-gray-50">
       <SubHeader title="购物车" onBack={onBack} />
 
-      {successAnim && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 text-center shadow-2xl">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Check size={32} className="text-green-500" />
-            </div>
-            <p className="text-gray-900" style={{ fontWeight: 700 }}>下单成功！</p>
-            <p className="text-gray-400 text-sm mt-1">请稍候，商家正在处理</p>
-          </div>
-        </div>
+      {pendingPayment && (
+        <PaymentModal
+          orderId={pendingPayment.orderId}
+          total={pendingPayment.total}
+          onPaid={handlePaid}
+          onClose={() => { setPendingPayment(null); onOrderSuccess(pendingPayment.orderId); }}
+        />
       )}
 
       {cart.length === 0 ? (
