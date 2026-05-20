@@ -1,6 +1,6 @@
 import logging
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,8 +34,8 @@ async def get_merchant_public(merchant_id: int, db: AsyncSession = Depends(get_d
 
 @router.get("", response_model=list[MerchantOut])
 async def list_merchants(
-    skip: int = 0,
-    limit: int = 200,
+    skip: int = Query(0, ge=0, le=100_000),
+    limit: int = Query(200, ge=1, le=1000),
     admin: Optional[dict] = Depends(verify_admin_optional),
     db: AsyncSession = Depends(get_db),
 ):
@@ -93,11 +93,12 @@ async def update_merchant(
     merchant = await db.get(Merchant, merchant_id)
     if not merchant:
         raise HTTPException(404, "Merchant not found")
-    for k, v in body.model_dump(exclude_none=True).items():
+    changes = body.model_dump(exclude_none=True)
+    for k, v in changes.items():
         setattr(merchant, k, v)
     await audit_record(
         db, actor=admin["sub"], action="UPDATE", resource="merchants",
-        resource_id=str(merchant_id),
+        resource_id=str(merchant_id), detail=changes,
         ip=request.client.host if request.client else None,
     )
     await db.commit()
@@ -118,11 +119,12 @@ async def patch_merchant(
     merchant = await db.get(Merchant, merchant_id)
     if not merchant:
         raise HTTPException(404, "Merchant not found")
-    for k, v in body.model_dump(exclude_none=True).items():
+    changes = body.model_dump(exclude_none=True)
+    for k, v in changes.items():
         setattr(merchant, k, v)
     await audit_record(
         db, actor=admin["sub"], action="UPDATE", resource="merchants",
-        resource_id=str(merchant_id),
+        resource_id=str(merchant_id), detail=changes,
         ip=request.client.host if request.client else None,
     )
     await db.commit()

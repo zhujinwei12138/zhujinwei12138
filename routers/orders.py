@@ -2,19 +2,26 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from audit import record as audit_record
-from auth import require_merchant_scope, scoped_merchant_id, verify_admin
+from auth import decode_customer_id_optional, require_merchant_scope, scoped_merchant_id, verify_admin
 from database import get_db
 from models import Merchant, Order, Product
 from schemas import OrderIn, OrderOut, OrderStatusIn
 import redis_client as rc
 
 _BTABLE_RATE_PREFIX = "rate:by_table:"  # per IP, 30 req/min
+_CANCEL_RATE_PREFIX = "rate:cancel:"    # per IP, 5 req/min
+
+_optional_bearer = HTTPBearer(auto_error=False)
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 logger = logging.getLogger(__name__)
@@ -35,8 +42,8 @@ async def _publish_order_status(order_id: int, status: str) -> None:
 
 @router.get("", response_model=list[OrderOut])
 async def list_orders(
-    skip: int = 0,
-    limit: int = 200,
+    skip: int = Query(0, ge=0, le=100_000),
+    limit: int = Query(200, ge=1, le=1000),
     admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -139,7 +146,11 @@ async def get_order(
 
 
 @router.post("", response_model=OrderOut)
-async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
+async def create_order(
+    body: OrderIn,
+    db: AsyncSession = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+):
     merchant = await db.get(Merchant, body.merchant_id)
     if not merchant or merchant.status != "active":
         raise HTTPException(404, "商家不存在或已停业")
@@ -158,18 +169,28 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
             product.stock -= item.quantity
         products_map[item.id] = product
 
-    # Use server-side prices to prevent client-side price manipulation
-    server_total = round(
-        sum(float(products_map[i.id].price) * i.quantity for i in body.items), 2
+    # Use server-side prices — prevents client price manipulation and ensures accurate audit trail
+    server_total = float(
+        sum(Decimal(str(products_map[i.id].price)) * i.quantity for i in body.items)
+        .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     )
+    server_items = [
+        {**item.model_dump(), "price": float(products_map[item.id].price)}
+        for item in body.items
+    ]
+
+    # customer_id must come from a valid customer token, never from untrusted request body
+    customer_id: Optional[str] = None
+    if credentials:
+        customer_id = decode_customer_id_optional(credentials.credentials)
 
     order = Order(
         merchant_id=body.merchant_id,
         table_no=body.table_no,
-        items=[item.model_dump() for item in body.items],
+        items=server_items,
         total=server_total,
         status="pending_payment",
-        customer_id=getattr(body, "customer_id", None),
+        customer_id=customer_id,
     )
     db.add(order)
     await db.commit()
@@ -178,8 +199,18 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{order_id}/customer-cancel")
-async def customer_cancel_order(order_id: int, db: AsyncSession = Depends(get_db)):
+async def customer_cancel_order(order_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     """Customer-accessible cancel — only allowed for pending_payment orders (not yet paid)."""
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = _CANCEL_RATE_PREFIX + client_ip
+    count = await rc.redis.get(rate_key)
+    if count and int(count) >= 5:
+        raise HTTPException(429, "操作过于频繁，请稍后再试")
+    async with rc.redis.pipeline(transaction=False) as pipe:
+        await pipe.incr(rate_key)
+        await pipe.expire(rate_key, 60)
+        await pipe.execute()
+
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")

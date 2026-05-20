@@ -114,3 +114,14 @@ def scoped_merchant_id(admin: dict) -> Optional[int]:
         return None
     return admin.get("merchant_id")
 
+
+def decode_customer_id_optional(token: str) -> Optional[str]:
+    """Returns customer_id from a valid customer Bearer token, or None."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("role") == "customer":
+            return payload.get("sub")
+    except Exception:
+        pass
+    return None
+

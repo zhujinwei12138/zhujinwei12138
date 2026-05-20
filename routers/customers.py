@@ -8,6 +8,7 @@ import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -123,11 +124,16 @@ async def verify_otp(body: CustomerVerifyOTP, db: AsyncSession = Depends(get_db)
     result = await db.execute(select(Customer).where(Customer.phone == body.phone))
     customer = result.scalar_one_or_none()
     if not customer:
-        customer = Customer(id=str(uuid.uuid4()), phone=body.phone)
-        db.add(customer)
-        await db.commit()
-        await db.refresh(customer)
-        logger.info("Customer created: id=%s", customer.id)
+        try:
+            customer = Customer(id=str(uuid.uuid4()), phone=body.phone)
+            db.add(customer)
+            await db.commit()
+            await db.refresh(customer)
+            logger.info("Customer created: id=%s", customer.id)
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(select(Customer).where(Customer.phone == body.phone))
+            customer = result.scalar_one()
 
     token = _create_customer_token(customer.id, customer.phone)
     return {"token": token, "customer": CustomerOut.model_validate(customer)}

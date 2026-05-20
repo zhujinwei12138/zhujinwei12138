@@ -7,10 +7,11 @@ import os
 import secrets
 import time
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,8 +52,8 @@ def _txn_dedup_key(txn_id: str) -> str:
 
 @router.get("", response_model=list[PaymentOut])
 async def list_payments(
-    skip: int = 0,
-    limit: int = 200,
+    skip: int = Query(0, ge=0, le=100_000),
+    limit: int = Query(200, ge=1, le=1000),
     admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -109,7 +110,9 @@ async def get_payment(pay_id: str, db: AsyncSession = Depends(get_db)):
     if not payment:
         raise HTTPException(404, "Payment not found")
 
-    if cached_status is None and payment.status == "pending":
+    now = datetime.now(timezone.utc)
+    expired_in_db = payment.expired_at and payment.expired_at < now
+    if (cached_status is None or expired_in_db) and payment.status == "pending":
         payment.status = "expired"
         await db.commit()
         await db.refresh(payment)
@@ -211,7 +214,9 @@ async def prepay(pay_id: str, db: AsyncSession = Depends(get_db)):
     if not order:
         raise HTTPException(404, "Order not found")
 
-    amount_fen = round(float(payment.amount) * 100)
+    amount_fen = int(
+        (Decimal(str(payment.amount)) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    )
 
     if payment.method == "wechat":
         if not all([WECHAT_MCH_ID, WECHAT_APP_ID, WECHAT_API_V3_KEY, WECHAT_CERT_SERIAL, WECHAT_PRIVATE_KEY_PATH]):
@@ -327,6 +332,12 @@ async def payment_callback(gateway: str, request: Request, db: AsyncSession = De
 
     order = await db.get(Order, payment.order_id)
     if order:
+        if order.merchant_id != payment.merchant_id:
+            logger.warning(
+                "Merchant mismatch in callback: pay=%s pay_merchant=%s order_merchant=%s",
+                pay_id, payment.merchant_id, order.merchant_id,
+            )
+            return _gateway_response(gateway, success=False)
         order.status = "paid"
         order.paid_at = now
 

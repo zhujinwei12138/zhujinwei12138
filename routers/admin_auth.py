@@ -1,6 +1,6 @@
 import logging
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -253,8 +253,8 @@ async def change_own_password(
 
 @router.get("/audit-logs")
 async def list_audit_logs(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0, le=100_000),
+    limit: int = Query(100, ge=1, le=500),
     admin: dict = Depends(verify_admin),
     db: AsyncSession = Depends(get_db),
 ):

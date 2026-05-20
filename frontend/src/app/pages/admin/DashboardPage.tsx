@@ -204,7 +204,7 @@ export default function DashboardPage() {
                 <p className="text-gray-300 text-xs mt-0.5">{new Date(order.timestamp).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{order.total}</span>
+                <span className="text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{order.total.toFixed(2)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[order.status]}`} style={{ fontWeight: 500 }}>{statusLabel[order.status]}</span>
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                   <td className="px-5 py-3.5 text-gray-500 text-sm max-w-48 truncate">
                     {order.items.map((i) => `${i.beerName}×${i.quantity}`).join("、")}
                   </td>
-                  <td className="px-5 py-3.5 text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{order.total}</td>
+                  <td className="px-5 py-3.5 text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{order.total.toFixed(2)}</td>
                   <td className="px-5 py-3.5">
                     <span className={`text-xs px-2 py-1 rounded-full ${statusStyle[order.status]}`} style={{ fontWeight: 500 }}>
                       {statusLabel[order.status]}

@@ -68,7 +68,7 @@ export default function SettingsAdminPage() {
             action={
               <button onClick={() => setToggles((prev) => prev.map((v, i) => i === idx ? !v : v))}
                 className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${toggles[idx] ? "bg-amber-500" : "bg-gray-200"}`}>
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${toggles[idx] ? "left-5.5" : "left-0.5"}`} />
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${toggles[idx] ? "right-0.5" : "left-0.5"}`} />
               </button>
             }
           />

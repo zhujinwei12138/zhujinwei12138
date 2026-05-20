@@ -189,6 +189,10 @@ async def upload_product_image(
             os.remove(old_path)
 
     product.image_url = f"/uploads/{filename}"
+    await audit_record(
+        db, actor=admin["sub"], action="IMAGE_UPLOAD", resource="products",
+        resource_id=str(product_id), detail={"filename": filename},
+    )
     await db.commit()
     await db.refresh(product)
     await _invalidate_product_cache()

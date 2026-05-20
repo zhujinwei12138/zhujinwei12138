@@ -439,7 +439,7 @@ function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }:
                   <p className="text-gray-900 text-sm" style={{ fontWeight: 600 }}>{item.name}</p>
                   <p className="text-gray-400 text-xs">{item.volume}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-amber-600" style={{ fontWeight: 700 }}>¥{item.price}</span>
+                    <span className="text-amber-600" style={{ fontWeight: 700 }}>¥{item.price.toFixed(2)}</span>
                     <div className="flex items-center gap-2">
                       <button onClick={() => updateCartQuantity(item.id, item.quantity - 1)} className="w-7 h-7 rounded-full border border-amber-400 flex items-center justify-center text-amber-500">
                         <Minus size={12} />
@@ -563,11 +563,18 @@ function AccountSecurityPage({ onBack }: { onBack: () => void }) {
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(0);
   const [toast, setToast] = useState("");
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
 
   const sendCode = () => {
     if (!/^1[3-9]\d{9}$/.test(phone)) { setToast("请输入正确的手机号"); return; }
     setCountdown(60);
-    const t = setInterval(() => setCountdown((c) => { if (c <= 1) { clearInterval(t); return 0; } return c - 1; }), 1000);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => setCountdown((c) => {
+      if (c <= 1) { clearInterval(countdownRef.current!); countdownRef.current = null; return 0; }
+      return c - 1;
+    }), 1000);
     setToast("验证码已发送");
     setTimeout(() => setToast(""), 2000);
   };
