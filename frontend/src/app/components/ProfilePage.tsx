@@ -31,6 +31,14 @@ const ORDER_TABS: { id: OrderTab; label: string; icon: React.ElementType }[] = [
   { id: "cancelled", label: "退款/售后", icon: RefreshCw },
 ];
 
+// "退款/售后" tab covers cancelled + refunding + refunded
+const TAB_STATUSES: Record<OrderTab, OrderStatus[]> = {
+  pending: ["pending"],
+  preparing: ["preparing"],
+  completed: ["completed"],
+  cancelled: ["cancelled", "refunding", "refunded"],
+};
+
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "待付款", preparing: "待收货", completed: "已完成",
   cancelled: "退款/售后", refunding: "退款中", refunded: "已退款",
@@ -56,7 +64,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
   const [payTarget, setPayTarget] = useState<{ orderId: string; total: number } | null>(null);
 
   const myOrders = orders.filter((o) => myOrderIds.includes(o.id));
-  const tabOrders = myOrders.filter((o) => o.status === activeTab);
+  const tabOrders = myOrders.filter((o) => TAB_STATUSES[activeTab].includes(o.status));
 
   const submitReview = () => {
     if (reviewTarget) {
@@ -76,7 +84,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
       {/* Tabs */}
       <div className="flex bg-white border-b border-gray-100 sticky top-[61px] z-10">
         {ORDER_TABS.map(({ id, label }) => {
-          const count = myOrders.filter((o) => o.status === id).length;
+          const count = myOrders.filter((o) => TAB_STATUSES[id].includes(o.status)).length;
           return (
             <button
               key={id}
@@ -147,6 +155,12 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                   )}
                   {order.status === "cancelled" && (
                     <button onClick={() => showToast("如需退款请联系商家处理")} className="px-3 py-1.5 rounded-xl border border-amber-400 text-amber-600 text-xs" style={{ fontWeight: 500 }}>申请退款</button>
+                  )}
+                  {order.status === "refunding" && (
+                    <span className="text-orange-500 text-xs px-2.5 py-1">退款处理中</span>
+                  )}
+                  {order.status === "refunded" && (
+                    <span className="text-purple-500 text-xs px-2.5 py-1">已退款</span>
                   )}
                 </div>
               </div>

@@ -47,7 +47,7 @@ async def test_create_product_invalid_price(async_client: AsyncClient, admin_hea
 
 @pytest.mark.asyncio
 async def test_create_product_invalid_category(async_client: AsyncClient, admin_headers: dict):
-    body = {**_PRODUCT_BODY, "category": "饮料"}
+    body = {**_PRODUCT_BODY, "category": ""}
     res = await async_client.post("/api/products", json=body, headers=admin_headers)
     assert res.status_code == 422
 
