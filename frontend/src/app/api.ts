@@ -113,20 +113,20 @@ export async function updateOrderStatus(id: number, status: string): Promise<voi
 // ── Payments ──────────────────────────────────────────────────────────────────
 
 export interface APIPayment {
-  id: number; order_id: number; method: string; status: string;
+  id: string; order_id: number; method: string; status: string;
   amount: number | string; created_at: string;
 }
 
-export async function createPayment(orderId: number, method: string): Promise<{ pay_id: number }> {
+export async function createPayment(orderId: number, method: string): Promise<APIPayment> {
   return request("/api/payments/create", { method: "POST", body: JSON.stringify({ order_id: orderId, method }) });
 }
-export async function getPayment(payId: number): Promise<{ status: string }> {
+export async function getPayment(payId: string): Promise<{ status: string }> {
   return request(`/api/payments/${payId}`);
 }
-export async function mockPay(payId: number): Promise<void> {
+export async function mockPay(payId: string): Promise<void> {
   return request(`/api/payments/${payId}/mock-pay`, { method: "POST" });
 }
-export async function refundPayment(payId: number, reason: string): Promise<void> {
+export async function refundPayment(payId: string, reason: string): Promise<void> {
   return request(`/api/payments/${payId}/refund`, { method: "POST", body: JSON.stringify({ reason }) }, true);
 }
 export async function getPayments(): Promise<APIPayment[]> {

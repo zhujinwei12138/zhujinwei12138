@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from audit import record as audit_record
 from auth import require_merchant_scope, scoped_merchant_id, verify_admin
 from database import get_db
-from models import Order, Product
+from models import Merchant, Order, Product
 from schemas import OrderIn, OrderOut, OrderStatusIn
 import redis_client as rc
 
@@ -20,7 +20,8 @@ router = APIRouter(prefix="/api/orders", tags=["orders"])
 logger = logging.getLogger(__name__)
 
 ALLOWED_STATUS_TRANSITIONS = {
-    "paid": ["preparing", "cancelled"],
+    "pending_payment": ["cancelled"],          # admin can cancel unpaid orders
+    "paid": ["preparing", "completed", "cancelled"],  # completed allowed without preparing step
     "preparing": ["completed", "cancelled"],
 }
 
@@ -139,6 +140,9 @@ async def get_order(
 
 @router.post("", response_model=OrderOut)
 async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
+    merchant = await db.get(Merchant, body.merchant_id)
+    if not merchant or merchant.status != "active":
+        raise HTTPException(404, "商家不存在或已停业")
     for item in body.items:
         result = await db.execute(
             select(Product).where(Product.id == item.id).with_for_update()

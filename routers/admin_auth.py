@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -134,7 +134,7 @@ async def update_admin_user(
 
 class AdminUserPatch(BaseModel):
     username: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[Literal["super_admin", "merchant_admin"]] = None
     merchant_id: Optional[int] = None
     is_active: Optional[bool] = None
 

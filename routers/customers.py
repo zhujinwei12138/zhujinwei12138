@@ -27,8 +27,9 @@ _SECRET = os.getenv("ADMIN_SECRET_KEY", "change-this-before-production")
 _ALGORITHM = "HS256"
 
 # Rate limiting keys
-_OTP_SEND_PREFIX = "otp_send:"    # per phone: 1/min
-_OTP_IP_PREFIX = "otp_ip:"        # per IP: 10/5min
+_OTP_SEND_PREFIX = "otp_send:"      # per phone: 1/min
+_OTP_IP_PREFIX = "otp_ip:"          # per IP: 10/5min
+_OTP_VERIFY_PREFIX = "otp_verify:"  # per phone: max 5 attempts before OTP invalidated
 
 _customer_bearer = HTTPBearer()
 
@@ -100,11 +101,24 @@ async def send_otp(body: CustomerSendOTP, request: Request):
 
 @router.post("/verify-otp")
 async def verify_otp(body: CustomerVerifyOTP, db: AsyncSession = Depends(get_db)):
+    # Brute-force protection: max 5 attempts per OTP before it's invalidated
+    verify_key = _OTP_VERIFY_PREFIX + body.phone
+    attempts = await rc.redis.get(verify_key)
+    if attempts and int(attempts) >= 5:
+        await rc.redis.delete(_otp_key(body.phone))
+        await rc.redis.delete(verify_key)
+        raise HTTPException(429, "验证次数过多，请重新获取验证码")
+
     stored = await rc.redis.get(_otp_key(body.phone))
     if not stored or stored != body.code:
+        async with rc.redis.pipeline(transaction=False) as pipe:
+            await pipe.incr(verify_key)
+            await pipe.expire(verify_key, _OTP_TTL)
+            await pipe.execute()
         raise HTTPException(400, "验证码无效或已过期")
 
     await rc.redis.delete(_otp_key(body.phone))
+    await rc.redis.delete(verify_key)
 
     result = await db.execute(select(Customer).where(Customer.phone == body.phone))
     customer = result.scalar_one_or_none()

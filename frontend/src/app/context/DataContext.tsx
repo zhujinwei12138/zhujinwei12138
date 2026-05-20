@@ -159,7 +159,7 @@ interface DataContextType {
   removeProductTag: (tag: string) => void;
   reloadMerchants: () => Promise<void>;
   reloadOrders: () => Promise<void>;
-  reloadProducts: () => Promise<void>;
+  reloadProducts: (merchantId?: number) => Promise<void>;
   reloadAdminUsers: () => Promise<void>;
 }
 
@@ -210,10 +210,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const reloadProducts = useCallback(async () => {
+  const reloadProducts = useCallback(async (merchantId?: number) => {
     setLoadingProducts(true);
     try {
-      const raw = await API.getProducts();
+      const raw = await API.getProducts(merchantId);
       setProducts(raw.map(adaptProduct));
       const cats = Array.from(new Set(raw.map((p) => p.category).filter(Boolean)));
       if (cats.length > 0) {
@@ -314,24 +314,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateOrderStatus = useCallback(async (id: string, status: OrderStatus, refundReason?: string) => {
-    let backendStatus: string;
-    if (status === "preparing") backendStatus = "preparing";
-    else if (status === "completed") backendStatus = "completed";
-    else if (status === "cancelled") backendStatus = "cancelled";
-    else if (status === "refunded" || status === "refunding") {
-      backendStatus = "cancelled";
+    if (status === "refunded" || status === "refunding") {
+      // Refund path: call the refund endpoint which handles order+payment status server-side.
+      // Do NOT also call updateOrderStatus — the backend would reject "refunded → cancelled".
       if (refundReason) {
-        try {
-          const payments = await API.getPayments();
-          const pay = payments.find((p) => String(p.order_id) === id);
-          if (pay) await API.refundPayment(pay.id, refundReason);
-        } catch { /* best effort */ }
+        const payments = await API.getPayments();
+        const pay = payments.find((p) => String(p.order_id) === id);
+        if (pay) await API.refundPayment(pay.id, refundReason);
       }
-    } else {
-      backendStatus = "cancelled";
+      setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "refunded", ...(refundReason ? { refundReason } : {}) } : o));
+      return;
     }
+
+    const backendStatusMap: Partial<Record<OrderStatus, string>> = {
+      preparing: "preparing",
+      completed: "completed",
+      cancelled: "cancelled",
+    };
+    const backendStatus = backendStatusMap[status] ?? "cancelled";
     await API.updateOrderStatus(Number(id), backendStatus);
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status, ...(refundReason ? { refundReason } : {}) } : o));
+    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
   }, []);
 
   const clearAllOrders = useCallback(() => setOrders([]), []);

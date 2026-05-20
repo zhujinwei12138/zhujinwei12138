@@ -53,7 +53,7 @@ function SetupOverlay({ merchants, onConfirm }: {
 }
 
 export default function OrderPage() {
-  const { merchants, products, productCategories, cart, addToCart, removeFromCart, updateCartQuantity } = useData();
+  const { merchants, loadingMerchants, products, productCategories, reloadProducts, cart, addToCart, removeFromCart, updateCartQuantity } = useData();
 
   // Convert products from API to Beer shape expected by BeerCard
   const beers: Beer[] = useMemo(() =>
@@ -86,9 +86,13 @@ export default function OrderPage() {
   const activeMerchants = merchants.filter((m) => m.status === "active");
   const currentMerchant = merchants.find((m) => m.id === merchantId);
 
+  // Wait until merchant list is loaded before deciding to show the setup overlay.
+  // Without this guard, currentMerchant is always undefined while loading, causing
+  // the overlay to flash even when the user has already set up their session.
   useEffect(() => {
+    if (loadingMerchants) return;
     if (!merchantId || !tableNo || !currentMerchant) setShowSetup(true);
-  }, []);
+  }, [loadingMerchants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSetupConfirm = (mid: string, tno: string) => {
     setMerchantId(mid);
@@ -96,7 +100,16 @@ export default function OrderPage() {
     localStorage.setItem("order_merchantId", mid);
     localStorage.setItem("order_tableNo", tno);
     setShowSetup(false);
+    // Load products for the selected merchant (includes merchant-specific + platform products)
+    reloadProducts(Number(mid));
   };
+
+  // Load merchant-specific products when returning to a session with saved merchantId
+  useEffect(() => {
+    if (!loadingMerchants && merchantId && currentMerchant) {
+      reloadProducts(Number(merchantId));
+    }
+  }, [loadingMerchants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBeerCardClick = (beer: Beer) => {
     setSelectedBeer(beer);

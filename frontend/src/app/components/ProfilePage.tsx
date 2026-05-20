@@ -32,13 +32,16 @@ const ORDER_TABS: { id: OrderTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: "待付款", preparing: "待收货", completed: "已完成", cancelled: "退款/售后",
+  pending: "待付款", preparing: "待收货", completed: "已完成",
+  cancelled: "退款/售后", refunding: "退款中", refunded: "已退款",
 };
 const STATUS_COLORS: Record<OrderStatus, string> = {
   pending: "text-yellow-600 bg-yellow-50",
   preparing: "text-blue-600 bg-blue-50",
   completed: "text-green-600 bg-green-50",
   cancelled: "text-gray-400 bg-gray-50",
+  refunding: "text-orange-600 bg-orange-50",
+  refunded: "text-purple-600 bg-purple-50",
 };
 
 function MyOrdersPage({ onBack }: { onBack: () => void }) {
@@ -190,7 +193,7 @@ interface PaymentModalProps {
 function PaymentModal({ orderId, total, onPaid, onClose }: PaymentModalProps) {
   const [payMethod, setPayMethod] = useState<"wechat" | "alipay">("wechat");
   const [payState, setPayState] = useState<PayState>("choosing");
-  const [payId, setPayId] = useState<number | null>(null);
+  const [payId, setPayId] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -198,7 +201,7 @@ function PaymentModal({ orderId, total, onPaid, onClose }: PaymentModalProps) {
 
   useEffect(() => () => stopPoll(), []);
 
-  const startPolling = (pid: number) => {
+  const startPolling = (pid: string) => {
     stopPoll();
     pollRef.current = setInterval(async () => {
       try {
@@ -219,9 +222,9 @@ function PaymentModal({ orderId, total, onPaid, onClose }: PaymentModalProps) {
     setPayState("waiting");
     setErrMsg("");
     try {
-      const { pay_id } = await API.createPayment(Number(orderId), payMethod);
-      setPayId(pay_id);
-      startPolling(pay_id);
+      const payment = await API.createPayment(Number(orderId), payMethod);
+      setPayId(payment.id);
+      startPolling(payment.id);
     } catch (e) {
       setPayState("failed");
       setErrMsg(e instanceof Error ? e.message : "创建支付失败");

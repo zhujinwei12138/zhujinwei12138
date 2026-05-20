@@ -115,6 +115,8 @@ async def get_payment(pay_id: str, db: AsyncSession = Depends(get_db)):
         await db.refresh(payment)
     elif cached_status and cached_status != payment.status:
         payment.status = cached_status
+        await db.commit()
+        await db.refresh(payment)
 
     return payment
 
