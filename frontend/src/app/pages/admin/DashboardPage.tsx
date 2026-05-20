@@ -100,9 +100,12 @@ export default function DashboardPage() {
     preparing: "bg-blue-100 text-blue-700",
     completed: "bg-green-100 text-green-600",
     cancelled: "bg-gray-100 text-gray-400",
+    refunding: "bg-orange-100 text-orange-600",
+    refunded: "bg-purple-100 text-purple-500",
   };
   const statusLabel: Record<string, string> = {
     pending: "待处理", preparing: "制作中", completed: "已完成", cancelled: "已取消",
+    refunding: "退款中", refunded: "已退款",
   };
 
   return (

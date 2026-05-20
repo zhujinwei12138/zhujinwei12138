@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -157,5 +157,7 @@ if os.path.isdir(_dist):
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "Not found")
         index = os.path.join(_dist, "index.html")
         return FileResponse(index)

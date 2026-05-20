@@ -49,7 +49,7 @@ async def merchant_stats(
 
     qty_map: dict[int, int] = {}
     for row_mid, items in item_rows:
-        qty_map[row_mid] = qty_map.get(row_mid, 0) + sum(item["quantity"] for item in items)
+        qty_map[row_mid] = qty_map.get(row_mid, 0) + sum(item.get("quantity", 0) for item in (items or []))
 
     return [
         MerchantStats(

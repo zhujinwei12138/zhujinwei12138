@@ -318,7 +318,7 @@ export default function OrdersAdminPage() {
                     {order.items.map((i) => `${i.beerName}×${i.quantity}`).join("、")}
                   </td>
                   <td className="px-5 py-3.5 text-amber-600 text-sm whitespace-nowrap" style={{ fontWeight: 600 }}>
-                    ¥{order.total}
+                    ¥{Number(order.total).toFixed(2)}
                   </td>
                   <td className="px-5 py-3.5"><StatusBadge status={order.status} /></td>
                   <td className="px-5 py-3.5">

@@ -331,7 +331,7 @@ export default function ProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3.5">
-                    <AvailabilityToggle value={p.isAvailable} onChange={(v) => updateProduct(p.id, { isAvailable: v })} />
+                    <AvailabilityToggle value={p.isAvailable} onChange={(v) => updateProduct(p.id, { isAvailable: v }).catch(() => showToast("更新失败，请重试"))} />
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2 justify-end">

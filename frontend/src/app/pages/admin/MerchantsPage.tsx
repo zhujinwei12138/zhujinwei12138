@@ -256,7 +256,7 @@ export default function MerchantsPage() {
                 </div>
                 <div className="flex items-center gap-3 mt-2 pl-12">
                   <button
-                    onClick={() => updateMerchant(m.id, { status: m.status === "active" ? "inactive" : "active" })}
+                    onClick={() => updateMerchant(m.id, { status: m.status === "active" ? "inactive" : "active" }).catch(() => showToast("更新失败，请重试"))}
                     className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${m.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                     style={{ fontWeight: 500 }}
                   >
@@ -298,7 +298,7 @@ export default function MerchantsPage() {
                   <td className="px-5 py-4 text-gray-600 text-sm whitespace-nowrap">{m.phone}</td>
                   <td className="px-5 py-4">
                     <button
-                      onClick={() => updateMerchant(m.id, { status: m.status === "active" ? "inactive" : "active" })}
+                      onClick={() => updateMerchant(m.id, { status: m.status === "active" ? "inactive" : "active" }).catch(() => showToast("更新失败，请重试"))}
                       className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full transition-colors cursor-pointer ${
                         m.status === "active" ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                       }`}

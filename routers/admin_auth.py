@@ -121,6 +121,12 @@ async def update_admin_user(
     user = await db.get(AdminUser, user_id)
     if not user:
         raise HTTPException(404, "User not found")
+    if body.username != user.username:
+        dup = await db.execute(
+            select(AdminUser).where(AdminUser.username == body.username)
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(409, "用户名已存在")
     user.username = body.username
     user.password_hash = hash_password(body.password)
     user.role = body.role
@@ -152,6 +158,11 @@ async def patch_admin_user(
     if not user:
         raise HTTPException(404, "User not found")
     if body.username is not None:
+        dup = await db.execute(
+            select(AdminUser).where(AdminUser.username == body.username, AdminUser.id != user_id)
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(409, "用户名已存在")
         user.username = body.username
     if body.role is not None:
         user.role = body.role
