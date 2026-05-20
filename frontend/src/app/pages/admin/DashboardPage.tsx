@@ -106,7 +106,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div>
         <h1 className="text-gray-900" style={{ fontWeight: 700 }}>数据概览</h1>
         <p className="text-gray-400 text-sm">实时掌握平台运营情况</p>
@@ -128,10 +128,10 @@ export default function DashboardPage() {
             <p className="text-gray-400 text-xs mt-0.5">本周合计 ¥{stats.weekRevenue.toLocaleString()}</p>
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={trendData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#9ca3af" }} />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#9ca3af" }} />
             <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} tickFormatter={(v) => `¥${v}`} />
             <Tooltip
               contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 8px 32px rgba(0,0,0,0.1)", fontSize: 13 }}
@@ -188,7 +188,26 @@ export default function DashboardPage() {
           <h3 className="text-gray-900" style={{ fontWeight: 600 }}>最新订单</h3>
           <span className="text-gray-400 text-xs">最近 8 笔</span>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile card list */}
+        <div className="lg:hidden divide-y divide-gray-50">
+          {recentOrders.map((order) => (
+            <div key={order.id} className="px-4 py-3 flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-gray-800 text-sm truncate" style={{ fontWeight: 500 }}>{order.merchantName}</span>
+                  <span className="bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5 rounded flex-shrink-0">{order.tableNo}</span>
+                </div>
+                <p className="text-gray-400 text-xs truncate">{order.items.map((i) => `${i.beerName}×${i.quantity}`).join("、")}</p>
+                <p className="text-gray-300 text-xs mt-0.5">{new Date(order.timestamp).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <span className="text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{order.total}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[order.status]}`} style={{ fontWeight: 500 }}>{statusLabel[order.status]}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50">

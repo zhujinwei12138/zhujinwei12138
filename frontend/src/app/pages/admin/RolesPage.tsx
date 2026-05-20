@@ -47,8 +47,8 @@ function AdminModal({ user, merchants, onClose, onSave }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-gray-900" style={{ fontWeight: 700 }}>{user ? "编辑账号" : "新增账号"}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400"><X size={18} /></button>
@@ -190,19 +190,19 @@ export default function RolesPage() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-5">
       {toast && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm">
           <Check size={16} className="text-green-400" /> {toast}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-gray-900" style={{ fontWeight: 700 }}>角色管理</h1>
           <p className="text-gray-400 text-sm">共 {adminUsers.length} 个账号，管理后台访问权限</p>
         </div>
-        <button onClick={() => setEditUser(null)} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm hover:bg-amber-600 transition-colors" style={{ fontWeight: 600 }}>
+        <button onClick={() => setEditUser(null)} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl text-sm hover:bg-amber-600 transition-colors flex-shrink-0" style={{ fontWeight: 600 }}>
           <Plus size={16} /> 新增账号
         </button>
       </div>
@@ -228,7 +228,7 @@ export default function RolesPage() {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {([["all", "全部"], ["super_admin", "超级管理员"], ["admin", "管理员"]] as const).map(([val, label]) => (
           <button key={val} onClick={() => setFilterRole(val)}
             className={`px-4 py-1.5 rounded-full text-sm transition-colors ${filterRole === val ? "bg-amber-500 text-white" : "bg-white border border-gray-200 text-gray-500 hover:border-gray-300"}`}
