@@ -139,7 +139,7 @@ function OrderDetailModal({ order, onClose, onStatusChange }: {
                     </div>
                     <div className="text-right">
                       <p className="text-gray-500 text-sm">×{item.quantity}</p>
-                      <p className="text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{(item.price * item.quantity)}</p>
+                      <p className="text-amber-600 text-sm" style={{ fontWeight: 600 }}>¥{(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   </div>
                 ))}
@@ -211,7 +211,10 @@ export default function OrdersAdminPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [page, setPage] = useState(1);
+  const [toast, setToast] = useState<string | null>(null);
   const PAGE_SIZE = 15;
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const filtered = useMemo(() => {
     const now = Date.now();
@@ -235,6 +238,11 @@ export default function OrdersAdminPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 lg:space-y-5">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm">
+          <CheckCircle2 size={16} className="text-green-400" /> {toast}
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-gray-900" style={{ fontWeight: 700 }}>订单管理</h1>
@@ -328,13 +336,13 @@ export default function OrdersAdminPage() {
                         <Eye size={14} />
                       </button>
                       {order.status === "pending" && (
-                        <button onClick={() => updateOrderStatus(order.id, "preparing")}
+                        <button onClick={() => updateOrderStatus(order.id, "preparing").catch(() => showToast("操作失败，请重试"))}
                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors" title="开始制作">
                           <ChefHat size={14} />
                         </button>
                       )}
                       {(order.status === "pending" || order.status === "preparing") && (
-                        <button onClick={() => updateOrderStatus(order.id, "completed")}
+                        <button onClick={() => updateOrderStatus(order.id, "completed").catch(() => showToast("操作失败，请重试"))}
                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-green-50 text-green-500 hover:bg-green-100 transition-colors" title="标记完成">
                           <CheckCircle2 size={14} />
                         </button>
@@ -375,7 +383,10 @@ export default function OrdersAdminPage() {
         <OrderDetailModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onStatusChange={(status, refundReason) => updateOrderStatus(selectedOrder.id, status, refundReason)}
+          onStatusChange={async (status, refundReason) => {
+            try { await updateOrderStatus(selectedOrder.id, status, refundReason); }
+            catch { showToast("操作失败，请重试"); }
+          }}
         />
       )}
     </div>

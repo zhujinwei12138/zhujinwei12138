@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,7 +135,7 @@ async def verify_otp(body: CustomerVerifyOTP, db: AsyncSession = Depends(get_db)
 
 @router.get("/me/orders", response_model=list[OrderOut])
 async def my_orders(
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=100),
     credentials: HTTPAuthorizationCredentials = Depends(_customer_bearer),
     db: AsyncSession = Depends(get_db),
 ):

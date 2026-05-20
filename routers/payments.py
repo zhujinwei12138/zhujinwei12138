@@ -211,7 +211,7 @@ async def prepay(pay_id: str, db: AsyncSession = Depends(get_db)):
     if not order:
         raise HTTPException(404, "Order not found")
 
-    amount_fen = int(float(payment.amount) * 100)
+    amount_fen = round(float(payment.amount) * 100)
 
     if payment.method == "wechat":
         if not all([WECHAT_MCH_ID, WECHAT_APP_ID, WECHAT_API_V3_KEY, WECHAT_CERT_SERIAL, WECHAT_PRIVATE_KEY_PATH]):

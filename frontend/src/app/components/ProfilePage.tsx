@@ -48,6 +48,9 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
   const { orders, myOrderIds, cancelMyOrder } = useData();
   const [activeTab, setActiveTab] = useState<OrderTab>("pending");
   const [reviewTarget, setReviewTarget] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [payTarget, setPayTarget] = useState<{ orderId: string; total: number } | null>(null);
@@ -59,11 +62,15 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
     if (reviewTarget) {
       setReviewTarget(null);
       setReviewText("");
+      showToast("感谢您的反馈！");
     }
   };
 
   return (
     <div className="flex flex-col flex-1 bg-gray-50">
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>
+      )}
       <SubHeader title="我的订单" onBack={onBack} />
 
       {/* Tabs */}
@@ -110,7 +117,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                 {order.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-sm">
                     <span className="text-gray-600">{item.beerName} <span className="text-gray-400">×{item.quantity}</span></span>
-                    <span className="text-gray-500">¥{item.price * item.quantity}</span>
+                    <span className="text-gray-500">¥{(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -119,7 +126,16 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                 <div className="flex gap-2">
                   {order.status === "pending" && (
                     <>
-                      <button onClick={() => cancelMyOrder(order.id)} className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-xs">取消订单</button>
+                      <button
+                        disabled={cancellingId === order.id}
+                        onClick={async () => {
+                          setCancellingId(order.id);
+                          try { await cancelMyOrder(order.id); }
+                          catch { showToast("取消失败，请重试"); }
+                          finally { setCancellingId(null); }
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-xs disabled:opacity-50"
+                      >取消订单</button>
                       <button onClick={() => setPayTarget({ orderId: order.id, total: order.total })} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去付款</button>
                     </>
                   )}
@@ -130,7 +146,7 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                     <button onClick={() => setReviewTarget(order.id)} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去评价</button>
                   )}
                   {order.status === "cancelled" && (
-                    <button className="px-3 py-1.5 rounded-xl border border-amber-400 text-amber-600 text-xs" style={{ fontWeight: 500 }}>申请退款</button>
+                    <button onClick={() => showToast("如需退款请联系商家处理")} className="px-3 py-1.5 rounded-xl border border-amber-400 text-amber-600 text-xs" style={{ fontWeight: 500 }}>申请退款</button>
                   )}
                 </div>
               </div>
@@ -342,9 +358,13 @@ function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }:
   const { cart, removeFromCart, updateCartQuantity, clearCart, addOrder, addMyOrderId } = useData();
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const [pendingPayment, setPendingPayment] = useState<{ orderId: string; total: number } | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleCheckout = async () => {
     if (cart.length === 0 || !merchantId) return;
+    setSubmitting(true);
+    setCheckoutError("");
     try {
       const orderId = await addOrder({
         merchantId,
@@ -357,8 +377,9 @@ function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }:
       clearCart();
       setPendingPayment({ orderId, total });
     } catch (e) {
-      console.error("Checkout failed", e);
-      alert("下单失败，请重试");
+      setCheckoutError(e instanceof Error ? e.message : "下单失败，请重试");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -424,17 +445,20 @@ function CartPage({ onBack, onOrderSuccess, merchantId, merchantName, tableNo }:
             {!merchantId && (
               <p className="text-red-500 text-xs text-center mb-2">请先在首页选择商家和桌号</p>
             )}
+            {checkoutError && (
+              <p className="text-red-500 text-xs text-center mb-2">{checkoutError}</p>
+            )}
             <div className="flex items-center justify-between mb-3">
               <span className="text-gray-500">合计</span>
               <span className="text-amber-600" style={{ fontWeight: 700, fontSize: "1.3rem" }}>¥{total.toFixed(2)}</span>
             </div>
             <button
               onClick={handleCheckout}
-              disabled={!merchantId || !tableNo}
+              disabled={!merchantId || !tableNo || submitting}
               className="w-full bg-amber-500 text-white py-3.5 rounded-2xl disabled:opacity-40 active:scale-95 transition-transform"
               style={{ fontWeight: 600 }}
             >
-              提交订单
+              {submitting ? "提交中…" : "提交订单"}
             </button>
           </div>
         </>

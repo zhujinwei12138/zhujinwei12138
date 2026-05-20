@@ -59,6 +59,9 @@ export async function createMerchant(data: Omit<APIMerchant, "id" | "created_at"
 export async function updateMerchant(id: number, data: Partial<Omit<APIMerchant, "id" | "created_at">>): Promise<APIMerchant> {
   return request(`/api/merchants/${id}`, { method: "PUT", body: JSON.stringify(data) }, true);
 }
+export async function patchMerchant(id: number, data: Partial<Omit<APIMerchant, "id" | "created_at">>): Promise<APIMerchant> {
+  return request(`/api/merchants/${id}`, { method: "PATCH", body: JSON.stringify(data) }, true);
+}
 export async function deleteMerchant(id: number): Promise<void> {
   return request(`/api/merchants/${id}`, { method: "DELETE" }, true);
 }

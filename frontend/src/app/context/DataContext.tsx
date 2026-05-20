@@ -277,7 +277,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [reloadMerchants]);
 
   const updateMerchant = useCallback(async (id: string, data: Partial<Omit<Merchant, "id" | "createdAt">>) => {
-    await API.updateMerchant(Number(id), {
+    await API.patchMerchant(Number(id), {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.address !== undefined && { address: data.address }),
       ...(data.phone !== undefined && { phone: data.phone }),

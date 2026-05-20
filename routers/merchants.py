@@ -1,6 +1,7 @@
 import logging
-from typing import Optional
+from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,14 @@ from auth import require_merchant_scope, verify_admin, verify_admin_optional, ve
 from database import get_db
 from models import Merchant
 from schemas import MerchantIn, MerchantOut
+
+
+class MerchantPatch(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    table_count: Optional[int] = Field(None, ge=1, le=500)
+    status: Optional[Literal["active", "inactive"]] = None
 
 router = APIRouter(prefix="/api/merchants", tags=["merchants"])
 logger = logging.getLogger(__name__)
@@ -80,6 +89,31 @@ async def update_merchant(
     db: AsyncSession = Depends(get_db),
 ):
     """super_admin: any merchant. merchant_admin: only their own."""
+    require_merchant_scope(admin, merchant_id)
+    merchant = await db.get(Merchant, merchant_id)
+    if not merchant:
+        raise HTTPException(404, "Merchant not found")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(merchant, k, v)
+    await audit_record(
+        db, actor=admin["sub"], action="UPDATE", resource="merchants",
+        resource_id=str(merchant_id),
+        ip=request.client.host if request.client else None,
+    )
+    await db.commit()
+    await db.refresh(merchant)
+    return merchant
+
+
+@router.patch("/{merchant_id}", response_model=MerchantOut)
+async def patch_merchant(
+    merchant_id: int,
+    body: MerchantPatch,
+    request: Request,
+    admin: dict = Depends(verify_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Partial update — only provided fields are changed."""
     require_merchant_scope(admin, merchant_id)
     merchant = await db.get(Merchant, merchant_id)
     if not merchant:
