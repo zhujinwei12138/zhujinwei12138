@@ -37,7 +37,6 @@ function AdminModal({ user, merchants, onClose, onSave }: {
   const validate = () => {
     const e: Partial<Record<keyof AdminForm, string>> = {};
     if (!form.name.trim()) e.name = "必填";
-    if (!form.email.trim()) e.email = "必填";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -183,10 +182,14 @@ export default function RolesPage() {
 
   const filtered = adminUsers.filter((u) => filterRole === "all" || u.role === filterRole);
 
-  const handleSave = (data: Omit<AdminUser, "id" | "createdAt">) => {
-    if (editUser === null) { addAdminUser(data); showToast("账号已创建"); }
-    else if (editUser) { updateAdminUser(editUser.id, data); showToast("账号已更新"); }
-    setEditUser(undefined);
+  const handleSave = async (data: Omit<AdminUser, "id" | "createdAt">) => {
+    try {
+      if (editUser === null) { await addAdminUser(data); showToast("账号已创建"); }
+      else if (editUser) { await updateAdminUser(editUser.id, data); showToast("账号已更新"); }
+      setEditUser(undefined);
+    } catch {
+      showToast("操作失败，请重试");
+    }
   };
 
   return (
@@ -324,7 +327,7 @@ export default function RolesPage() {
       {deleteTarget && (
         <DeleteConfirm
           name={deleteTarget.name}
-          onConfirm={() => { deleteAdminUser(deleteTarget.id); setDeleteTarget(null); showToast("账号已删除"); }}
+          onConfirm={async () => { try { await deleteAdminUser(deleteTarget.id); showToast("账号已删除"); } catch { showToast("删除失败，请重试"); } setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />
       )}

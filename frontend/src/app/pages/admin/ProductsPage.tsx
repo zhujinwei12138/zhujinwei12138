@@ -233,15 +233,19 @@ export default function ProductsPage() {
     return matchSearch && matchCat && matchAvail;
   });
 
-  const handleSave = (data: Omit<Product, "id" | "createdAt">) => {
-    if (editProduct === null) {
-      addProduct(data);
-      showToast("商品已添加");
-    } else if (editProduct) {
-      updateProduct(editProduct.id, data);
-      showToast("商品已更新");
+  const handleSave = async (data: Omit<Product, "id" | "createdAt">) => {
+    try {
+      if (editProduct === null) {
+        await addProduct(data);
+        showToast("商品已添加");
+      } else if (editProduct) {
+        await updateProduct(editProduct.id, data);
+        showToast("商品已更新");
+      }
+      setEditProduct(undefined);
+    } catch {
+      showToast("操作失败，请重试");
     }
-    setEditProduct(undefined);
   };
 
   return (
@@ -362,7 +366,7 @@ export default function ProductsPage() {
       {deleteTarget && (
         <DeleteConfirm
           name={deleteTarget.name}
-          onConfirm={() => { deleteProduct(deleteTarget.id); setDeleteTarget(null); showToast("商品已删除"); }}
+          onConfirm={async () => { try { await deleteProduct(deleteTarget.id); showToast("商品已删除"); } catch { showToast("删除失败，请重试"); } setDeleteTarget(null); }}
           onCancel={() => setDeleteTarget(null)}
         />
       )}

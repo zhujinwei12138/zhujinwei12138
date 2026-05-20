@@ -58,8 +58,8 @@ export default function SettingsAdminPage() {
 
       <SettingSection title="系统信息">
         <SettingRow icon={Beer} label="系统名称" desc="啤酒销售管理系统 v2.0" />
-        <SettingRow icon={Database} label="数据存储" desc={`本地 localStorage · 商家 ${merchants.length} 家 · 订单 ${orders.length} 笔`} />
-        <SettingRow icon={Shield} label="数据安全" desc="所有数据存储于本地浏览器，不上传至任何服务器" />
+        <SettingRow icon={Database} label="数据存储" desc={`PostgreSQL 数据库 · 商家 ${merchants.length} 家 · 订单 ${orders.length} 笔`} />
+        <SettingRow icon={Shield} label="数据安全" desc="数据存储于服务端 PostgreSQL，通过 JWT 鉴权保护" />
       </SettingSection>
 
       <SettingSection title="通知与提醒">

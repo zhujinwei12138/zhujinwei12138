@@ -10,7 +10,7 @@ class ProductIn(BaseModel):
     volume: str = Field("", max_length=20)
     alcohol: str = Field("", max_length=10)
     price: float = Field(..., gt=0)
-    category: Literal["精酿", "瓶装", "罐装"]
+    category: str = Field(..., min_length=1, max_length=20)
     badge: Optional[str] = Field(None, max_length=20)
     gradient: str = ""
     stock: Optional[int] = Field(None, ge=0)  # None = 不限库存

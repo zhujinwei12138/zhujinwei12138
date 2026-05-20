@@ -35,7 +35,6 @@ async def seed_if_empty():
 
         # ── Merchants（先于 Products，因为 products.merchant_id 有外键）────────
         merchants_data = _load("merchants.json")
-        first_merchant_id = merchants_data[0]["id"] if merchants_data else 1
         for m in merchants_data:
             db.add(Merchant(
                 id=m["id"],
@@ -50,11 +49,11 @@ async def seed_if_empty():
         # ── Flush merchants so FK resolves for products ───────────────────────
         await db.flush()
 
-        # ── Products（归属第一个商家作为默认示例数据）─────────────────────────
+        # ── Products（平台公共商品，merchant_id=None 表示对所有商家可见）──────
         for p in _load("products.json"):
             db.add(Product(
                 id=p["id"],
-                merchant_id=first_merchant_id,
+                merchant_id=None,
                 name=p["name"],
                 description=p.get("description", ""),
                 volume=p.get("volume", ""),

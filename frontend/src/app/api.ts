@@ -109,6 +109,9 @@ export async function createOrder(body: CreateOrderBody): Promise<{ id: number }
 export async function updateOrderStatus(id: number, status: string): Promise<void> {
   return request(`/api/orders/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) }, true);
 }
+export async function cancelOrderByCustomer(orderId: number): Promise<void> {
+  return request(`/api/orders/${orderId}/customer-cancel`, { method: "POST" });
+}
 
 // ── Payments ──────────────────────────────────────────────────────────────────
 

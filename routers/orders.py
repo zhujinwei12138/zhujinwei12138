@@ -143,6 +143,8 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
     merchant = await db.get(Merchant, body.merchant_id)
     if not merchant or merchant.status != "active":
         raise HTTPException(404, "商家不存在或已停业")
+
+    products_map: dict[int, Product] = {}
     for item in body.items:
         result = await db.execute(
             select(Product).where(Product.id == item.id).with_for_update()
@@ -154,12 +156,18 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
             raise HTTPException(400, f"商品「{product.name}」库存不足，当前剩余：{product.stock}")
         if product.stock is not None:
             product.stock -= item.quantity
+        products_map[item.id] = product
+
+    # Use server-side prices to prevent client-side price manipulation
+    server_total = round(
+        sum(float(products_map[i.id].price) * i.quantity for i in body.items), 2
+    )
 
     order = Order(
         merchant_id=body.merchant_id,
         table_no=body.table_no,
         items=[item.model_dump() for item in body.items],
-        total=body.total,
+        total=server_total,
         status="pending_payment",
         customer_id=getattr(body, "customer_id", None),
     )
@@ -167,6 +175,20 @@ async def create_order(body: OrderIn, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(order)
     return order
+
+
+@router.post("/{order_id}/customer-cancel")
+async def customer_cancel_order(order_id: int, db: AsyncSession = Depends(get_db)):
+    """Customer-accessible cancel — only allowed for pending_payment orders (not yet paid)."""
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.status != "pending_payment":
+        raise HTTPException(400, "只能取消待付款的订单，如需退款请联系商家")
+    order.status = "cancelled"
+    order.cancelled_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.put("/{order_id}/status", response_model=OrderOut)

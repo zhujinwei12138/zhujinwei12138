@@ -14,7 +14,7 @@ interface MerchantFormData {
 
 function MerchantModal({ initial, onSave, onClose }: {
   initial?: Merchant | null;
-  onSave: (data: MerchantFormData) => void;
+  onSave: (data: MerchantFormData) => Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<MerchantFormData>({
@@ -34,10 +34,9 @@ function MerchantModal({ initial, onSave, onClose }: {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    onSave(form);
-    onClose();
+    try { await onSave(form); onClose(); } catch { /* parent shows error */ }
   };
 
   const fields = [
@@ -142,6 +141,9 @@ export default function MerchantsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [modal, setModal] = useState<{ open: boolean; merchant: Merchant | null }>({ open: false, merchant: null });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const filtered = useMemo(() =>
     merchants.filter((m) => {
@@ -165,6 +167,11 @@ export default function MerchantsPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 lg:space-y-5">
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl text-sm">
+          <CheckCircle2 size={16} className="text-green-400" /> {toast}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-gray-900" style={{ fontWeight: 700 }}>商家管理</h1>
@@ -356,14 +363,17 @@ export default function MerchantsPage() {
       {modal.open && (
         <MerchantModal
           initial={modal.merchant}
-          onSave={(data) => { if (modal.merchant) updateMerchant(modal.merchant.id, data); else addMerchant(data); }}
+          onSave={async (data) => {
+            if (modal.merchant) { await updateMerchant(modal.merchant.id, data); showToast("商家已更新"); }
+            else { await addMerchant(data); showToast("商家已添加"); }
+          }}
           onClose={() => setModal({ open: false, merchant: null })}
         />
       )}
       {deleteId && deletingMerchant && (
         <DeleteConfirm
           name={deletingMerchant.name}
-          onConfirm={() => { deleteMerchant(deleteId); setDeleteId(null); }}
+          onConfirm={async () => { try { await deleteMerchant(deleteId); showToast("商家已删除"); } catch { showToast("删除失败，请重试"); } setDeleteId(null); }}
           onCancel={() => setDeleteId(null)}
         />
       )}

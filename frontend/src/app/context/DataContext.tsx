@@ -140,6 +140,7 @@ interface DataContextType {
   deleteMerchant: (id: string) => Promise<void>;
   addOrder: (order: Omit<SalesOrder, "id" | "timestamp" | "status" | "payId">) => Promise<string>;
   updateOrderStatus: (id: string, status: OrderStatus, refundReason?: string) => Promise<void>;
+  cancelMyOrder: (id: string) => Promise<void>;
   clearAllOrders: () => void;
   addToCart: (item: Omit<CartItem, "quantity">) => void;
   removeFromCart: (id: number) => void;
@@ -336,6 +337,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
   }, []);
 
+  const cancelMyOrder = useCallback(async (id: string) => {
+    await API.cancelOrderByCustomer(Number(id));
+    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "cancelled" as OrderStatus } : o));
+  }, []);
+
   const clearAllOrders = useCallback(() => setOrders([]), []);
 
   // ── Product CRUD ───────────────────────────────────────────────────────────
@@ -445,7 +451,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       productCategories, productTags,
       loadingMerchants, loadingOrders, loadingProducts, loadingAdminUsers,
       addMerchant, updateMerchant, deleteMerchant,
-      addOrder, updateOrderStatus, clearAllOrders,
+      addOrder, updateOrderStatus, cancelMyOrder, clearAllOrders,
       addToCart, removeFromCart, updateCartQuantity, clearCart,
       updateUserProfile, addMyOrderId,
       addProduct, updateProduct, deleteProduct,

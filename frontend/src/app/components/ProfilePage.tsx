@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 };
 
 function MyOrdersPage({ onBack }: { onBack: () => void }) {
-  const { orders, myOrderIds, updateOrderStatus } = useData();
+  const { orders, myOrderIds, cancelMyOrder } = useData();
   const [activeTab, setActiveTab] = useState<OrderTab>("pending");
   const [reviewTarget, setReviewTarget] = useState<string | null>(null);
   const [reviewText, setReviewText] = useState("");
@@ -57,7 +57,6 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
 
   const submitReview = () => {
     if (reviewTarget) {
-      updateOrderStatus(reviewTarget, "completed");
       setReviewTarget(null);
       setReviewText("");
     }
@@ -120,12 +119,12 @@ function MyOrdersPage({ onBack }: { onBack: () => void }) {
                 <div className="flex gap-2">
                   {order.status === "pending" && (
                     <>
-                      <button onClick={() => updateOrderStatus(order.id, "cancelled")} className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-xs">取消订单</button>
+                      <button onClick={() => cancelMyOrder(order.id)} className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-xs">取消订单</button>
                       <button onClick={() => setPayTarget({ orderId: order.id, total: order.total })} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去付款</button>
                     </>
                   )}
                   {order.status === "preparing" && (
-                    <button onClick={() => updateOrderStatus(order.id, "completed")} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>确认收货</button>
+                    <span className="text-blue-500 text-xs px-2.5 py-1">商家备餐中</span>
                   )}
                   {order.status === "completed" && (
                     <button onClick={() => setReviewTarget(order.id)} className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs" style={{ fontWeight: 600 }}>去评价</button>
